@@ -1,0 +1,258 @@
+/*
+ * arch/arm64/boot/dts/tegra210-tx1-cti-VPG003-IMX274-3CAM.dts
+ *
+ * Copyright (c) 2016, NVIDIA CORPORATION.  All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; version 2 of the License.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
+ */
+
+#include "tegra210-tx1-cti-base.dts"
+#include "jetson-platforms/tegra210-tx1-cti-camera-VPG003-IMX274-3CAM.dtsi"
+
+/ {
+	model = "jetson_tx1";
+	compatible = "nvidia,jetson-cv", "nvidia,tegra210";
+	nvidia,dtsfilename = "tegra210-tx1-cti-VPG003-IMX274-3CAM.dts";
+
+	#address-cells = <2>;
+	#size-cells = <2>;
+
+	chosen {
+		bootloader {
+			nvidia,skip-display-init;
+		};
+	};
+
+	host1x {
+		dc@54200000 {
+			status = "disabled";
+		};
+
+		dsi {
+			status = "disabled";
+			panel-a-wuxga-8-0 {
+				status = "disabled";
+			};
+			panel-s-wqxga-10-1 {
+				status = "disabled";
+			};
+		};
+
+		sor {
+			panel-s-edp-uhdtv-15-6 {
+				status = "disabled";
+			};
+			prod-settings {
+				status = "disabled";
+			};
+		};
+	};
+
+	i2c@7000c400 {
+		lp8557-backlight-a-wuxga-8-0@2c {
+			status = "disabled";
+		};
+	};
+
+	backlight {
+		status = "disabled";
+		panel-a-wuxga-8-0-bl {
+			status = "disabled";
+		};
+		panel-s-edp-uhdtv-15-6-bl {
+			status = "disabled";
+		};
+	};
+
+	sor {
+		status = "disabled";
+		prod-settings {
+			status = "disabled";
+		};
+		panel-s-edp-uhdtv-15-6 {
+			smartdimmer {
+				status = "disabled";
+			};
+		};
+	};
+	
+	/*spi@7000d400 {
+		status = "okay";
+		spidev@0 {
+			status = "okay";
+			compatible = "spidev";
+			reg = <0>;
+			spi-max-frequency=<12000000>;
+		};  
+    };*/
+	
+	/*spi@7000d600 {
+		status = "okay";
+		spidev@0 {
+			status = "okay";
+			compatible = "spidev";
+			reg = <0>;
+			spi-max-frequency=<12000000>;
+		};  
+    };*/
+	
+	/*spi@7000d800 {
+		status = "okay";
+		spidev@0 {
+			status = "okay";
+			compatible = "spidev";
+			reg = <0>;
+			spi-max-frequency=<12000000>;
+		};  
+    };*/
+	
+	
+	spi@7000da00 {
+		status = "okay";
+		can@0 {
+            status = "okay";
+            compatible = "microchip,mcp2515";
+            reg = <0>;	/* spi chip select 0 */
+            clocks = <&tegra_car TEGRA210_CLK_CLK_OUT_2>;
+            interrupt-parent = <&gpio>;
+                /* the first cell defines the
+                    index of the interrupt within the controller, while the second cell is used
+                    to specify any of the following flags:
+                    - bits[3:0] trigger type and level flags
+                    1 = low-to-high edge triggered
+                    2 = high-to-low edge triggered
+                    4 = active high level-sensitive
+                    8 = active low level-sensitive
+                */
+			interrupts = <TEGRA_GPIO(X, 3) 0x01>; /* GPIO_PX3/GPIO8/ALS_PROX_INT */
+			vdd-supply = <&battery_reg>;
+			xceiver-supply = <&battery_reg>;
+			spi-max-frequency=<24000000>;
+		};
+    };
+	
+	pcie-controller@1003000 {
+        pci@1,0 {
+            nvidia,num-lanes = <4>;
+            status = "okay";
+        };
+
+        pci@2,0 {
+            nvidia,num-lanes = <0>;
+            status = "disabled";
+        };
+		
+		 pci@2,0 {
+            nvidia,num-lanes = <1>;
+            status = "okay";
+        };
+    };
+
+	
+		
+	pinctrl@7009f000 {
+		status = "okay";
+		pinctrl-0 = <&tegra_padctl_uphy_pinmux_default>;
+		pinctrl-names = "default";
+		tegra_padctl_uphy_pinmux_default: pinmux {
+			usb2-test {
+				nvidia,lanes = "otg-3";
+				nvidia,function = "xusb";
+				nvidia,port-cap =
+				<TEGRA_PADCTL_PORT_HOST_ONLY>;
+			};
+			usb2-micro-AB-xusb {
+				nvidia,lanes = "otg-0";
+				nvidia,function = "xusb";
+				nvidia,port-cap =
+					<TEGRA_PADCTL_PORT_OTG_CAP>;
+			};
+			usb3-for-dev-mode {
+                nvidia,lanes = "uphy-lane-0";
+                nvidia,function = "usb3";
+                nvidia,usb3-port = <2>;
+                nvidia,usb2-map = <0>;
+                nvidia,port-cap =
+                    <TEGRA_PADCTL_PORT_HOST_ONLY>;
+            };
+			usb2-std-A-port0 {
+				 nvidia,lanes = "otg-1";
+				 nvidia,function = "xusb";
+				 nvidia,port-cap =
+					<TEGRA_PADCTL_PORT_HOST_ONLY>;
+			};
+			usb3-std-A-port0 {
+				 nvidia,lanes = "uphy-lane-5";		/* USB_SS0 */
+				 nvidia,function = "usb3";
+				 nvidia,usb3-port = <1>;
+				 nvidia,usb2-map = <2>;
+				 nvidia,port-cap =
+					<TEGRA_PADCTL_PORT_HOST_ONLY>;
+			};
+			usb2-eth {
+				 nvidia,lanes = "otg-2";
+				 nvidia,function = "xusb";
+				 nvidia,port-cap =
+					<TEGRA_PADCTL_PORT_HOST_ONLY>;
+			};
+			usb3-eth {
+                 nvidia,lanes = "uphy-lane-6";
+                 nvidia,function = "usb3";
+                 nvidia,usb3-port = <0>;
+                 nvidia,usb2-map = <1>;
+                 nvidia,port-cap =
+                        <TEGRA_PADCTL_PORT_HOST_ONLY>;
+            };
+			hsic {
+				 nvidia,lanes = "hsic-0";
+				 nvidia,function = "hsic";
+			};
+			pcie {
+				 nvidia,lanes =	"uphy-lane-1", "uphy-lane-2",
+								"uphy-lane-3", "uphy-lane-4";
+				 nvidia,function = "pcie";
+				 nvidia,pcie-controller = <0>;
+				 nvidia,pcie-lane-select =
+					<TEGRA_PADCTL_PCIE_LANE_X4>;
+			};
+			/delete-node/pcie-m2;
+			sata {
+				 nvidia,lanes = "uphy-lane-7";
+				 nvidia,function = "sata";
+			};
+		};
+	};
+
+	xusb@70090000 {
+		status = "okay";
+		extcon-cables = <&vbus_gpio_extcon 1>;
+		extcon-cable-names = "id";
+		#extcon-cells = <1>;
+		phys =	<&tegra_padctl_uphy TEGRA_PADCTL_UPHY_UTMI_P(3)>,	
+			<&tegra_padctl_uphy TEGRA_PADCTL_UPHY_USB3_P(2)>,
+			<&tegra_padctl_uphy TEGRA_PADCTL_UPHY_UTMI_P(2)>,
+			<&tegra_padctl_uphy TEGRA_PADCTL_UPHY_USB3_P(1)>,
+			<&tegra_padctl_uphy TEGRA_PADCTL_UPHY_UTMI_P(1)>,
+			<&tegra_padctl_uphy TEGRA_PADCTL_UPHY_USB3_P(0)>,
+			<&tegra_padctl_uphy TEGRA_PADCTL_UPHY_UTMI_P(0)>;
+		phy-names = "utmi-3", "usb3-2", "utmi-2", "usb3-1", "utmi-1", "usb3-0", "utmi-0";
+		nvidia,pmc-wakeup =
+			<&tegra_pmc
+				PMC_WAKE_TYPE_EVENT 41 PMC_TRIGGER_TYPE_HIGH>,
+			<&tegra_pmc
+				PMC_WAKE_TYPE_EVENT 44 PMC_TRIGGER_TYPE_HIGH>;
+	};
+	
+	
+};
+
+#include <t210-common-overrides/tegra210-power-dvfs-override-ucm2c.dtsi>
+
