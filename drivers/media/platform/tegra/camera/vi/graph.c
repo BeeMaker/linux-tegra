@@ -357,8 +357,12 @@ int tegra_vi_get_port_info(struct tegra_channel *chan,
 			continue;
 
 		ret = of_property_read_u32(port, "reg", &value);
-		if (ret < 0)
+        
+		printk("read reg property port->name = %s, ret = %d, val = %d\n", port->name, ret, value);
+		if (ret < 0){
+			dev_err(&chan->video.dev, "Failed to read reg property port->name = %s, ret = %d, val = %d\n", port->name, ret, value);
 			continue;
+        }
 
 		if (value != index)
 			continue;

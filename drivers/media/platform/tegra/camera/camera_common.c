@@ -15,6 +15,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+
 #include <media/camera_common.h>
 #include <linux/of_graph.h>
 #include <linux/string.h>

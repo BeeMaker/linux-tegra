@@ -16,44 +16,75 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+ 
 #include <linux/slab.h>
 #include <linux/uaccess.h>
 #include <linux/gpio.h>
 #include <linux/module.h>
-
 #include <linux/seq_file.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
 #include <linux/of_gpio.h>
-
 #include <media/camera_common.h>
 #include <media/imx274.h>
-
 #include "imx274_mode_tbls.h"
 
-#define IMX274_MAX_COARSE_DIFF		10
+static int debug;
+module_param(debug, int, 0644);
+MODULE_PARM_DESC(debug, "Debug level (0-2)");
 
-#define IMX274_GAIN_SHIFT		8
-#define IMX274_MIN_GAIN		(1 << IMX274_GAIN_SHIFT)
-#define IMX274_MAX_GAIN		(23 << IMX274_GAIN_SHIFT)
-#define IMX274_MIN_FRAME_LENGTH	(0x8ED)
-#define IMX274_MAX_FRAME_LENGTH	(0xB292)
+/* differ to max coarse */
+#define IMX274_MAX_COARSE_DIFF		(12)
+/* minimum gain value */
+#define IMX274_MIN_GAIN			(1)
+/* maximum gain value */
+#define IMX274_MAX_GAIN			(22)
+/* gain shift bits */
+#define IMX274_GAIN_SHIFT		(8)
+/* minimum frame length */
+#define IMX274_MIN_FRAME_LENGTH		(0x482)
+/* maximum frame length */
+#define IMX274_MAX_FRAME_LENGTH		(0x16893)
+/* minimum exposure coarse */
 #define IMX274_MIN_EXPOSURE_COARSE	(0x0001)
+/* maximum exposure coarse */
 #define IMX274_MAX_EXPOSURE_COARSE	\
 	(IMX274_MAX_FRAME_LENGTH-IMX274_MAX_COARSE_DIFF)
 
-#define IMX274_DEFAULT_GAIN		IMX274_MIN_GAIN
-#define IMX274_DEFAULT_FRAME_LENGTH	(0x111B)
+/* default gain value */
+#define IMX274_DEFAULT_GAIN		(IMX274_MIN_GAIN)
+/* default frame length value */
+#define IMX274_DEFAULT_FRAME_LENGTH	(0x11D2)
+/* default exposure coarse value */
 #define IMX274_DEFAULT_EXPOSURE_COARSE	\
 	(IMX274_DEFAULT_FRAME_LENGTH-IMX274_MAX_COARSE_DIFF)
 
-#define IMX274_DEFAULT_MODE	IMX274_MODE_3840X2160
+/* default mode */
+#define IMX274_DEFAULT_MODE		(IMX274_MODE_3864X2174)
 
-#define IMX274_DEFAULT_WIDTH	3864
-#define IMX274_DEFAULT_HEIGHT	2174
-#define IMX274_DEFAULT_DATAFMT	MEDIA_BUS_FMT_SRGGB10_1X10
-#define IMX274_DEFAULT_CLK_FREQ	24000000
+/* default image output width */
+#define IMX274_DEFAULT_WIDTH		(3864)
+/* default image output height */
+#define IMX274_DEFAULT_HEIGHT		(2174)
+/* default image data format */
+#define IMX274_DEFAULT_DATAFMT		(MEDIA_BUS_FMT_SRGGB10_1X10)
+/* default output clk frequency for camera */
+#define IMX274_DEFAULT_CLK_FREQ		(24000000)
 
+/*
+ * struct imx74 - imx274 structure
+ * @power: Camera common power rail structure
+ * @num_ctrls: The num of V4L2 control
+ * @i2c_client: Pointer to I2C client
+ * @subdev: Pointer to V4L2 subdevice structure
+ * @pad: Media pad structure
+ * @group_hold_prev: Group hold status
+ * @group_hold_en: Enable/Disable group hold
+ * @regmap: Pointer to regmap structure
+ * @s_data: Pointer to camera common data structure
+ * @p_data: Pointer to camera common pdata structure
+ * @ctrls: Pointer to V4L2 control list
+ */
 struct imx274 {
 	struct camera_common_power_rail	power;
 	int				num_ctrls;
@@ -70,19 +101,40 @@ struct imx274 {
 	struct v4l2_ctrl		*ctrls[];
 };
 
+/*
+ * struct sensror_regmap_config - sensor regmap config structure
+ * @reg_bits: Sensor register address width
+ * @val_bits: Sensor register value width
+ * @cache_type: Cache type
+ * @use_single_rw: Indicate only read or write a single time
+ */
 static const struct regmap_config sensor_regmap_config = {
-	.reg_bits = 16,
-	.val_bits = 8,
-	.cache_type = REGCACHE_RBTREE,
-	.use_single_rw = true,
+	.reg_bits	= 16,
+	.val_bits	= 8,
+	.cache_type	= REGCACHE_RBTREE,
+	.use_single_rw	= true,
 };
 
+/*
+ * Function declaration
+ */
 static int imx274_s_ctrl(struct v4l2_ctrl *ctrl);
+static int imx274_set_gain(struct imx274 *priv, s32 val);
+static int imx274_set_frame_length(struct imx274 *priv, s32 val);
+static int imx274_set_coarse_time(struct imx274 *priv, s32 val);
 
+/*
+ * imx274 V4L2 control operator
+ */
 static const struct v4l2_ctrl_ops imx274_ctrl_ops = {
-	.s_ctrl		= imx274_s_ctrl,
+	.s_ctrl			= imx274_s_ctrl,
 };
 
+/*
+ * V4L2 control configuration list
+ * the control Items includes gain, exposure,
+ * frame rate, group hold and HDR
+ */
 static struct v4l2_ctrl_config ctrl_config_list[] = {
 /* Do not change the name field for the controls! */
 	{
@@ -153,36 +205,69 @@ static struct v4l2_ctrl_config ctrl_config_list[] = {
 	},
 };
 
-static inline void imx274_get_vmax_regs(imx274_reg *regs,
-				u32 vmax)
+/*
+ * imx274_calculate_frame_legnth_regs - Function for calculate frame length
+ * register value
+ * @regs: Pointer to imx274 reg structure
+ * @frame_length: Frame length value
+ *
+ * This is used to calculate the frame length value for frame length register
+ */
+static inline void imx274_calculate_frame_length_regs(imx274_reg *regs,
+						      u32 frame_length)
 {
-	regs->addr = IMX274_VMAX_ADDR_MSB;
-	regs->val = (vmax >> 8) & 0xff;
-	(regs + 1)->addr = IMX274_VMAX_ADDR_LSB;
-	(regs + 1)->val = (vmax) & 0xff;
+	regs->addr = IMX274_FRAME_LENGTH_ADDR_1;
+	regs->val = (frame_length >> 16) & 0x01;
+	(regs + 1)->addr = IMX274_FRAME_LENGTH_ADDR_2;
+	(regs + 1)->val = (frame_length >> 8) & 0xff;
+	(regs + 2)->addr = IMX274_FRAME_LENGTH_ADDR_3;
+	(regs + 2)->val = (frame_length) & 0xff;
 }
 
-static inline void imx274_get_shr_regs(imx274_reg *regs,
-				u32 shr)
+/*
+ * imx274_calculate_coarse_time_regs - Function for calculate coarse time
+ * register value
+ * @regs: Pointer to imx274 reg structure
+ * @coarse_time: Coarse time value
+ *
+ * This is used to get the coarse time value for coarse time register
+ */
+static inline void imx274_calculate_coarse_time_regs(imx274_reg *regs,
+						     u32 coarse_time)
 {
-	regs->addr = IMX274_SHR_ADDR_MSB;
-	regs->val = (shr >> 8) & 0xff;
-	(regs + 1)->addr = IMX274_SHR_ADDR_LSB;
-	(regs + 1)->val = (shr) & 0xff;
+	regs->addr = IMX274_COARSE_TIME_ADDR_MSB;
+	regs->val = (coarse_time >> 8) & 0x00ff;
+	(regs + 1)->addr = IMX274_COARSE_TIME_ADDR_LSB;
+	(regs + 1)->val = (coarse_time) & 0x00ff;
 }
 
-static inline void imx274_get_gain_reg(imx274_reg *regs,
-				u16 gain)
+/*
+ * imx274_calculate_gain_regs - Function for calculate gain
+ * register value
+ * @regs: Pointer to imx274 reg structure
+ * @gain: Gain value
+ *
+ * This is used to get the gain value for gain register
+ */
+static inline void imx274_calculate_gain_regs(imx274_reg *regs,
+					      u16 gain)
 {
-	regs->addr = IMX274_GAIN_ADDR_MSB;
-	regs->val = (gain >> 8) & 0xff;
-	(regs + 1)->addr = IMX274_GAIN_ADDR_LSB;
+	regs->addr = IMX274_ANALOG_GAIN_ADDR_MSB;
+	regs->val = (gain >> 8) & 0x07;
+	(regs + 1)->addr = IMX274_ANALOG_GAIN_ADDR_LSB;
 	(regs + 1)->val = (gain) & 0xff;
 }
 
-static int test_mode;
-module_param(test_mode, int, 0644);
-
+/*
+ * imx274_read_reg - Function for reading register value
+ * @s_data: Pointer to camera common data structure
+ * @addr: Registr address
+ * @val: Pointer to register value
+ *
+ * This function is used to read a register value for imx274
+ *
+ * Return: 0 on success, errors otherwise
+ */
 static inline int imx274_read_reg(struct camera_common_data *s_data,
 				u16 addr, u8 *val)
 {
@@ -196,9 +281,19 @@ static inline int imx274_read_reg(struct camera_common_data *s_data,
 	return err;
 }
 
+/*
+ * imx274_write_reg - Function for writing register value
+ * @s_data: Pointer to camera common data structure
+ * @addr: Registr address
+ * @val: Register value
+ *
+ * This function is used to write a register value for imx274
+ *
+ * Return: 0 on success, errors otherwise
+ */
 static int imx274_write_reg(struct camera_common_data *s_data, u16 addr, u8 val)
 {
-	int err;
+	int err = 0;
 	struct imx274 *priv = (struct imx274 *)s_data->priv;
 
 	err = regmap_write(priv->regmap, addr, val);
@@ -209,6 +304,15 @@ static int imx274_write_reg(struct camera_common_data *s_data, u16 addr, u8 val)
 	return err;
 }
 
+/*
+ * regmap_util_write_table_8 - Function for writing register table
+ * @priv: Pointer to imx274 structure
+ * @table: Table containing register values
+ *
+ * This is used to write register table into sensor's reg map.
+ *
+ * Return: 0 on success, errors otherwise
+ */
 static int imx274_write_table(struct imx274 *priv,
 				const imx274_reg table[])
 {
@@ -219,14 +323,47 @@ static int imx274_write_table(struct imx274 *priv,
 					 IMX274_TABLE_END);
 }
 
+/*
+ * imx274_power_on - Function to power on the camera
+ * @s_data: Pointer to camera common data
+ *
+ * This is used to power on imx274 camera board
+ *
+ * Return: 0 on success, errors otherwise
+ */
 static int imx274_power_on(struct camera_common_data *s_data)
 {
 	int err = 0;
 	struct imx274 *priv = (struct imx274 *)s_data->priv;
 	struct camera_common_power_rail *pw = &priv->power;
+    struct device_node *node = priv->i2c_client->dev.of_node;	
+	int gpio;
 
 	dev_dbg(&priv->i2c_client->dev, "%s: power on\n", __func__);
-
+    
+    
+    if(!pw->reset_gpio) {		
+		gpio = of_get_named_gpio(node, "reset-gpios", 0);
+		if (gpio < 0) {
+			/* reset-gpio is not absolutely needed */
+			dev_dbg(&priv->i2c_client->dev, "reset gpios not in DT 0x%x \n", gpio);
+			gpio = 0;
+		}
+		pw->reset_gpio = (unsigned int)gpio;	
+		err = gpio_request(pw->reset_gpio, "imx274_reset_gpio");	
+		if (err) {
+			pw->reset_gpio = 0;
+			pr_err("%s gpio_request failed err 0x%x\n", __func__, err);
+		}
+		else {
+			err = gpio_direction_output(pw->reset_gpio, 1);
+			if (err) {
+				pr_err("%s gpio_direction_output failed err %d.\n", __func__, err);
+				pw->reset_gpio = 0;
+			}
+		}
+	}
+    
 	if (priv->pdata && priv->pdata->power_on) {
 		err = priv->pdata->power_on(pw);
 		if (err)
@@ -237,54 +374,26 @@ static int imx274_power_on(struct camera_common_data *s_data)
 	}
 
 	if (pw->reset_gpio)
-		gpio_set_value(pw->reset_gpio, 0);
-	if (pw->af_gpio)
-		gpio_set_value(pw->af_gpio, 1);
-	if (pw->pwdn_gpio)
-		gpio_set_value(pw->pwdn_gpio, 0);
-	usleep_range(10, 20);
-
-
-	if (pw->dvdd)
-		err = regulator_enable(pw->dvdd);
-	if (err)
-		goto imx274_dvdd_fail;
-
-	if (pw->iovdd)
-		err = regulator_enable(pw->iovdd);
-	if (err)
-		goto imx274_iovdd_fail;
-
-	if (pw->avdd)
-		err = regulator_enable(pw->avdd);
-	if (err)
-		goto imx274_avdd_fail;
+		gpio_set_value_cansleep(pw->reset_gpio, 0);
 
 	usleep_range(1, 2);
 	if (pw->reset_gpio)
-		gpio_set_value(pw->reset_gpio, 1);
-	if (pw->pwdn_gpio)
-		gpio_set_value(pw->pwdn_gpio, 1);
+		gpio_set_value_cansleep(pw->reset_gpio, 1);
 
 	usleep_range(300, 310);
 
 	pw->state = SWITCH_ON;
 	return 0;
-
-imx274_dvdd_fail:
-	if (pw->af_gpio)
-		gpio_set_value(pw->af_gpio, 0);
-
-imx274_iovdd_fail:
-	regulator_disable(pw->dvdd);
-
-imx274_avdd_fail:
-	regulator_disable(pw->iovdd);
-
-	pr_err("%s failed.\n", __func__);
-	return -ENODEV;
 }
 
+/*
+ * imx274_power_off - Function to power off the camera
+ * @s_data: Pointer to camera common data
+ *
+ * This is used to power off imx274 camera board
+ *
+ * Return: 0 on success, errors otherwise
+ */
 static int imx274_power_off(struct camera_common_data *s_data)
 {
 	int err = 0;
@@ -305,47 +414,41 @@ static int imx274_power_off(struct camera_common_data *s_data)
 
 	usleep_range(1, 2);
 	if (pw->reset_gpio)
-		gpio_set_value(pw->reset_gpio, 0);
-	if (pw->af_gpio)
-		gpio_set_value(pw->af_gpio, 0);
-	if (pw->pwdn_gpio)
-		gpio_set_value(pw->pwdn_gpio, 0);
-	usleep_range(1, 2);
-
-	if (pw->avdd)
-		regulator_disable(pw->avdd);
-	if (pw->iovdd)
-		regulator_disable(pw->iovdd);
-	if (pw->dvdd)
-		regulator_disable(pw->dvdd);
+		gpio_set_value_cansleep(pw->reset_gpio, 0);
 
 power_off_done:
 	pw->state = SWITCH_OFF;
 	return 0;
 }
 
+/*
+ * imx274_power_put - Function to put power
+ * @priv: Pointer to imx274 structure
+ *
+ * This is used to put power to tegra
+ *
+ * Return: 0 on success, errors otherwise
+ */
 static int imx274_power_put(struct imx274 *priv)
 {
 	struct camera_common_power_rail *pw = &priv->power;
 	if (unlikely(!pw))
 		return -EFAULT;
 
-	if (likely(pw->avdd))
-		regulator_put(pw->avdd);
-
-	if (likely(pw->iovdd))
-		regulator_put(pw->iovdd);
-
-	if (likely(pw->dvdd))
-		regulator_put(pw->dvdd);
-
-	pw->avdd = NULL;
-	pw->iovdd = NULL;
-	pw->dvdd = NULL;
+	/* because imx274 does not get power from Tegra */
+	/* so this function doing nothing */
 
 	return 0;
 }
 
+/*
+ * imx274_power_get - Function to get power
+ * @priv: Pointer to imx274 structure
+ *
+ * This is used to get power from tegra
+ *
+ * Return: 0 on success, errors otherwise
+ */
 static int imx274_power_get(struct imx274 *priv)
 {
 	struct camera_common_power_rail *pw = &priv->power;
@@ -375,30 +478,67 @@ static int imx274_power_get(struct imx274 *priv)
 			clk_set_parent(pw->mclk, parent);
 	}
 
-	/* ananlog 2.7v */
-	err |= camera_common_regulator_get(priv->i2c_client,
-			&pw->avdd, pdata->regulators.avdd);
-	/* digital 1.2v */
-	err |= camera_common_regulator_get(priv->i2c_client,
-			&pw->dvdd, pdata->regulators.dvdd);
-	/* IO 1.8v */
-	err |= camera_common_regulator_get(priv->i2c_client,
-			&pw->iovdd, pdata->regulators.iovdd);
-
 	if (!err) {
 		pw->reset_gpio = pdata->reset_gpio;
-		pw->af_gpio = pdata->af_gpio;
-		pw->pwdn_gpio = pdata->pwdn_gpio;
+
 	}
 
 	pw->state = SWITCH_OFF;
 	return err;
 }
 
-static int imx274_set_gain(struct imx274 *priv, s32 val);
-static int imx274_set_frame_length(struct imx274 *priv, s32 val);
-static int imx274_set_coarse_time(struct imx274 *priv, s32 val);
+/*
+ * imx274_start_stream - Function for starting stream per mode index
+ * @priv: Pointer to imx274 structure
+ * @mode: Mode index value
+ *
+ * This is used to start steam per mode index.
+ * mode = 0, start stream for sensor Mode 1: 3864x2174/raw10/60fps
+ * mode = 1, start stream for sensor Mode 3: 1932x1094/raw10/60fps
+ * mode = 2, start stream for sensor Mode 5: 1288x734/raw10/60fps
+ * mode = 3, start stream for sensor Mode 6: 1288x546/raw10/240fps
+ *
+ * Return: 0 on success, errors otherwise
+ */
+static int imx274_start_stream(struct imx274 *priv, int mode)
+{
+	int err = 0;
 
+	err = imx274_write_table(priv, mode_table[IMX274_MODE_START_STREAM_1]);
+	if (err)
+		return err;
+
+	err = imx274_write_table(priv, mode_table[IMX274_MODE_START_STREAM_2]);
+	if (err)
+		return err;
+
+	err = imx274_write_table(priv, mode_table[mode]);
+	if (err)
+		return err;
+
+	msleep(20);
+	err = imx274_write_table(priv, mode_table[IMX274_MODE_START_STREAM_3]);
+	if (err)
+		return err;
+
+	msleep(20);
+	err = imx274_write_table(priv, mode_table[IMX274_MODE_START_STREAM_4]);
+	if (err)
+		return err;
+
+	return 0;
+}
+
+/*
+ * imx274_s_stream - It is used to start/stop the streaming.
+ * @sd: V4L2 Sub device
+ * @enable: Flag (True / False)
+ *
+ * This function controls the start or stop of streaming for the
+ * imx274 sensor.
+ *
+ * Return: 0 on success, errors otherwise
+ */
 static int imx274_s_stream(struct v4l2_subdev *sd, int enable)
 {
 	struct i2c_client *client = v4l2_get_subdevdata(sd);
@@ -409,17 +549,13 @@ static int imx274_s_stream(struct v4l2_subdev *sd, int enable)
 
 	dev_dbg(&client->dev, "%s++\n", __func__);
 
-	imx274_write_table(priv, mode_table[IMX274_MODE_STOP_STREAM]);
-
 	if (!enable)
-		return 0;
+		return imx274_write_table(priv,
+			mode_table[IMX274_MODE_STOP_STREAM]);
 
-	dev_dbg(&client->dev, "%s mode[%d]\n", __func__, s_data->mode);
-
-	err = imx274_write_table(priv, mode_table[s_data->mode]);
+	err = imx274_start_stream(priv, s_data->mode);
 	if (err)
 		goto exit;
-
 
 	if (s_data->override_enable) {
 		/* write list of override regs for the asking frame length, */
@@ -446,24 +582,22 @@ static int imx274_s_stream(struct v4l2_subdev *sd, int enable)
 				"%s: error coarse time override\n", __func__);
 	}
 
-	if (test_mode) {
-		err = imx274_write_table(priv,
-			mode_table[IMX274_MODE_TEST_PATTERN]);
-		if (err)
-			goto exit;
-		}
-
-	err = imx274_write_table(priv, mode_table[IMX274_MODE_START_STREAM]);
-	if (err)
-		goto exit;
-
-
 	return 0;
 exit:
 	dev_dbg(&client->dev, "%s: error setting stream\n", __func__);
 	return err;
 }
 
+/*
+ * imx274_get_fmt - Get the pad format
+ * @sd: Pointer to V4L2 Sub device structure
+ * @cfg: Pointer to sub device pad information structure
+ * @fmt: Pointer to pad level media bus format
+ *
+ * This function is used to get the pad format information
+ *
+ * Return: 0 on success, errors otherwise
+ */
 static int imx274_get_fmt(struct v4l2_subdev *sd,
 		struct v4l2_subdev_pad_config *cfg,
 		struct v4l2_subdev_format *format)
@@ -471,9 +605,19 @@ static int imx274_get_fmt(struct v4l2_subdev *sd,
 	return camera_common_g_fmt(sd, &format->format);
 }
 
+/*
+ * imx274_set_fmt - This is used to set the pad format
+ * @sd: Pointer to V4L2 Sub device structure
+ * @cfg: Pointer to sub device pad information structure
+ * @format: Pointer to pad level media bus format
+ *
+ * This function is used to set the pad format
+ *
+ * Return: 0 on success, errors otherwise
+ */
 static int imx274_set_fmt(struct v4l2_subdev *sd,
 		struct v4l2_subdev_pad_config *cfg,
-	struct v4l2_subdev_format *format)
+		struct v4l2_subdev_format *format)
 {
 	int ret;
 
@@ -485,6 +629,15 @@ static int imx274_set_fmt(struct v4l2_subdev *sd,
 	return ret;
 }
 
+/*
+ * imx274_g_input_status - This is used to get input status
+ * @sd: Pointer to V4L2 Sub device structure
+ * @status: Pointer to status
+ *
+ * This function is used to get input status
+ *
+ * Return: 0 on success
+ */
 static int imx274_g_input_status(struct v4l2_subdev *sd, u32 *status)
 {
 	struct i2c_client *client = v4l2_get_subdevdata(sd);
@@ -496,35 +649,9 @@ static int imx274_g_input_status(struct v4l2_subdev *sd, u32 *status)
 	return 0;
 }
 
-static struct v4l2_subdev_video_ops imx274_subdev_video_ops = {
-	.s_stream	= imx274_s_stream,
-	.g_mbus_config	= camera_common_g_mbus_config,
-	.g_input_status	= imx274_g_input_status,
-};
-
-static struct v4l2_subdev_core_ops imx274_subdev_core_ops = {
-	.s_power	= camera_common_s_power,
-};
-
-static struct v4l2_subdev_pad_ops imx274_subdev_pad_ops = {
-	.set_fmt	= imx274_set_fmt,
-	.get_fmt	= imx274_get_fmt,
-	.enum_mbus_code = camera_common_enum_mbus_code,
-	.enum_frame_size        = camera_common_enum_framesizes,
-	.enum_frame_interval    = camera_common_enum_frameintervals,
-};
-
-static struct v4l2_subdev_ops imx274_subdev_ops = {
-	.core	= &imx274_subdev_core_ops,
-	.video	= &imx274_subdev_video_ops,
-	.pad	= &imx274_subdev_pad_ops,
-};
-
-static struct of_device_id imx274_of_match[] = {
-	{ .compatible = "nvidia,imx274", },
-	{ },
-};
-
+/*
+ * Camera common sensor operations
+ */
 static struct camera_common_sensor_ops imx274_common_ops = {
 	.power_on = imx274_power_on,
 	.power_off = imx274_power_off,
@@ -532,6 +659,14 @@ static struct camera_common_sensor_ops imx274_common_ops = {
 	.read_reg = imx274_read_reg,
 };
 
+/*
+ * im274_set_group_hold - Function to hold the sensor register
+ * @priv: Pinter to imx274 structure
+ *
+ * This is used to hold the imx274 sensor register
+ *
+ * Return: 0 on success, errors otherwise
+ */
 static int imx274_set_group_hold(struct imx274 *priv)
 {
 	int err;
@@ -559,27 +694,71 @@ fail:
 	return err;
 }
 
+/*
+ * imx274_to_real_gain - Function to translate to real gain
+ * @rep: Input value
+ * @shift: Shift bits
+ *
+ * This is used to translate from input value to real gain
+ *
+ * Return: Real gain value
+ */
+static u16 imx274_to_real_gain(u32 rep, int shift)
+{
+	u16 gain;
+	int gain_int;
+	int gain_dec;
+	int min_int = (1 << shift);
+
+	if (rep < IMX274_MIN_GAIN << IMX274_GAIN_SHIFT)
+		rep = IMX274_MIN_GAIN << IMX274_GAIN_SHIFT;
+	else if (rep > IMX274_MAX_GAIN << IMX274_GAIN_SHIFT)
+		rep = IMX274_MAX_GAIN << IMX274_GAIN_SHIFT;
+
+	gain_int = (int)(rep >> shift);
+	gain_dec = (int)(rep & ~(0xffff << shift));
+
+	rep = gain_int * min_int + gain_dec;
+	rep = 2048 - (2048 * min_int) / rep;
+
+	gain = (u16)rep;
+
+	return gain;
+}
+
+/*
+ * imx274_set_gain - Function called when setting analog gain
+ * @priv: Pointer to device structure
+ * @val: Value for gain
+ *
+ * Set the analog gain based on input value.
+ * Range: [1, 22]
+ *
+ * Return: 0 on success, errors otherwise
+ */
 static int imx274_set_gain(struct imx274 *priv, s32 val)
 {
 	imx274_reg reg_list[2];
 	int err;
-	int i = 0;
 	u16 gain;
+	int i;
 
+	dev_dbg(&priv->i2c_client->dev, "%s - val = %d\n", __func__, val);
+
+	if (!priv->group_hold_prev)
+		imx274_set_group_hold(priv);
+
+	val = val << IMX274_GAIN_SHIFT;
+	dev_dbg(&priv->i2c_client->dev, "input gain value: %d\n", val);
+
+	/* translate value, used to be xxxxxxxx.xxxxxxxx format, */
+	/* with 00000001.0000000 as gain of 1 */
+	gain = imx274_to_real_gain((u32)val, IMX274_GAIN_SHIFT);
+
+	imx274_calculate_gain_regs(reg_list, gain);
 	dev_dbg(&priv->i2c_client->dev,
-		"%s: val: %d\n", __func__, val);
+		"%s: gain %04x val: %04x\n", __func__, val, gain);
 
-	if (val < IMX274_MIN_GAIN)
-		val = IMX274_MIN_GAIN;
-	else if (val > IMX274_MAX_GAIN)
-		val = IMX274_MAX_GAIN;
-
-	gain = 2048 - (2048 * IMX274_MIN_GAIN / val);
-
-	imx274_get_gain_reg(reg_list, gain);
-	imx274_set_group_hold(priv);
-
-	/* writing analog gain */
 	for (i = 0; i < 2; i++) {
 		err = imx274_write_reg(priv->s_data, reg_list[i].addr,
 			 reg_list[i].val);
@@ -595,118 +774,192 @@ fail:
 	return err;
 }
 
+/*
+ * imx274_set_frame_length - Function called when setting frame length
+ * @priv: Pointer to device structure
+ * @val: Variable for frame length (= VMAX, i.e. vertical drive period length)
+ *
+ * Set frame length based on input value.
+ *
+ * Return: 0 on success, errors otherwise
+ */
 static int imx274_set_frame_length(struct imx274 *priv, s32 val)
 {
-	imx274_reg reg_list[2];
+	imx274_reg reg_list[3];
 	int err;
-	u32 frame_length;
-	u32 frame_rate;
-	int i = 0;
-	u8 svr;
-	u32 vmax;
+	u32 frame_length = 0;
+	int i;
+	u16 svr;
+	u8 reg_val[2];
 
-	dev_dbg(&priv->i2c_client->dev,
-		 "%s: val: %u\n", __func__, val);
+	dev_dbg(&priv->i2c_client->dev, "%s length = %d\n", __func__, val);
+
+	if (!priv->group_hold_prev)
+		imx274_set_group_hold(priv);
 
 	frame_length = (u32)val;
 
-	frame_rate = (u32)(IMX274_PIXEL_CLK_HZ /
-				(u32)(frame_length * IMX274_LINE_LENGTH));
+	/* svr */
+	err = imx274_read_reg(priv->s_data, IMX274_SVR_REG_LSB, &reg_val[0]);
+	err |= imx274_read_reg(priv->s_data, IMX274_SVR_REG_MSB, &reg_val[1]);
+	if (err)
+		goto fail;
+	svr = (reg_val[1] << 8) + reg_val[0];
 
-	imx274_read_reg(priv->s_data, IMX274_SVR_ADDR, &svr);
+	frame_length = frame_length / (svr + 1);
 
-	vmax = (u32)(72000000 /
-			(u32)(frame_rate * IMX274_HMAX * (svr + 1))) - 12;
+	imx274_calculate_frame_length_regs(reg_list, frame_length);
+	dev_dbg(&priv->i2c_client->dev,
+		"%s: val: %d\n", __func__, frame_length);
 
-	imx274_get_vmax_regs(reg_list, vmax);
-
-	imx274_set_group_hold(priv);
-
-	for (i = 0; i < 2; i++) {
+	for (i = 0; i < 3; i++) {
 		err = imx274_write_reg(priv->s_data, reg_list[i].addr,
 			 reg_list[i].val);
 		if (err)
 			goto fail;
 	}
 
-	dev_dbg(&priv->i2c_client->dev,
-		"%s: frame_rate: %d vmax: %u\n", __func__, frame_rate, vmax);
 	return 0;
 
 fail:
-	dev_info(&priv->i2c_client->dev,
-		 "%s: FRAME_LENGTH control error\n", __func__);
+	dev_dbg(&priv->i2c_client->dev,
+		"%s: FRAME_LENGTH control error\n", __func__);
 	return err;
 }
 
-static int imx274_calculate_shr(struct imx274 *priv, u32 rep)
+/*
+ * imx274_get_frame_length - Function for obtaining current frame length
+ * @priv: Pointer to device structure
+ * @val: Pointer to obainted value
+ *
+ * frame_length = vmax x (svr + 1), in unit of hmax.
+ *
+ * Return: 0 on success
+ */
+static int imx274_get_frame_length(struct imx274 *priv, s32 *val)
 {
-	u8 svr;
-	int shr;
-	int min;
-	int max;
-	u8 vmax_l;
-	u8 vmax_m;
+	int err;
+	u16 svr;
 	u32 vmax;
+	u8 reg_val[3];
 
-	imx274_read_reg(priv->s_data, IMX274_SVR_ADDR, &svr);
+	/* svr */
+	err = imx274_read_reg(priv->s_data, IMX274_SVR_REG_LSB, &reg_val[0]);
+	err |= imx274_read_reg(priv->s_data, IMX274_SVR_REG_MSB, &reg_val[1]);
+	if (err)
+		goto fail;
+	svr = (reg_val[1] << 8) + reg_val[0];
 
-	imx274_read_reg(priv->s_data, IMX274_VMAX_ADDR_LSB, &vmax_l);
-	imx274_read_reg(priv->s_data, IMX274_VMAX_ADDR_MSB, &vmax_m);
+	/* vmax */
+	err = imx274_read_reg(priv->s_data, IMX274_FRAME_LENGTH_ADDR_3,
+			      &reg_val[0]);
+	err |= imx274_read_reg(priv->s_data, IMX274_FRAME_LENGTH_ADDR_2,
+			       &reg_val[1]);
+	err |= imx274_read_reg(priv->s_data, IMX274_FRAME_LENGTH_ADDR_1,
+			       &reg_val[2]);
+	if (err)
+		goto fail;
+	vmax = ((reg_val[2] & 0x07) << 16) + (reg_val[1] << 8) + reg_val[0];
 
-	vmax = ((vmax_m << 8) + vmax_l);
-
-	min = IMX274_MODE1_SHR_MIN;
-	max = ((svr + 1) * IMX274_VMAX) - 4;
-
-	shr = vmax * (svr + 1) -
-			(rep * IMX274_ET_FACTOR - IMX274_MODE1_OFFSET) /
-			IMX274_HMAX;
-
-	if (shr < min)
-		shr = min;
-
-	if (shr > max)
-		shr = max;
-
+	*val = vmax * (svr + 1);
+	return 0;
+fail:
 	dev_dbg(&priv->i2c_client->dev,
-		 "%s: shr: %u vmax: %d\n", __func__, shr, vmax);
-	return shr;
+		"%s : Get frame_length error\n", __func__);
+	return err;
 }
 
+/*
+ * imx274_clamp_coarse_time - Function to clamp coarse time
+ * @priv: Pointer to imx274 structure
+ * @val: Pointer to coarse time value
+ *
+ * This is used to clamp coarse time for imx274 sensor.
+ *
+ * Return: 0 one success, errors otherwise
+ */
+static int imx274_clamp_coarse_time(struct imx274 *priv, s32 *val)
+{
+	int err;
+	s32 frame_length;
+
+	err = imx274_get_frame_length(priv, &frame_length);
+	if (err)
+		goto fail;
+
+	if (frame_length == 0)
+		frame_length = IMX274_MIN_FRAME_LENGTH;
+
+	*val = frame_length - *val; /* convert to raw shr */
+	if (*val > frame_length - IMX274_MAX_COARSE_DIFF)
+		*val = frame_length - IMX274_MAX_COARSE_DIFF;
+	else if (*val < IMX274_MIN_EXPOSURE_COARSE)
+		*val = IMX274_MIN_EXPOSURE_COARSE;
+
+	return 0;
+
+fail:
+	dev_dbg(&priv->i2c_client->dev,
+		"%s : EXPOSURE control error\n", __func__);
+	return err;
+}
+
+/*
+ * imx274_set_coarse_time - Function called when setting SHR value
+ * @priv: Pointer to imx274 structure
+ * @val: Value for exposure time in number of line_length, or [HMAX]
+ *
+ * Set SHR value based on input value.
+ *
+ * Return: 0 on success, errors otherwise
+ */
 static int imx274_set_coarse_time(struct imx274 *priv, s32 val)
 {
 	imx274_reg reg_list[2];
 	int err;
-	u32 coarse_time;
-	u32 shr;
-	int i = 0;
+	s32 coarse_time;
+	int i;
 
-	coarse_time = val;
+	dev_dbg(&priv->i2c_client->dev, "%s coarse time = %d\n", __func__, val);
 
-	dev_dbg(&priv->i2c_client->dev,
-		 "%s: val: %d\n", __func__, coarse_time);
+	if (!priv->group_hold_prev)
+		imx274_set_group_hold(priv);
 
-	shr = imx274_calculate_shr(priv, coarse_time);
+	coarse_time = (s32)val;
 
-	imx274_get_shr_regs(reg_list, shr);
-	imx274_set_group_hold(priv);
+	/* convert exposure_time to appropriate SHR value */
+	err = imx274_clamp_coarse_time(priv, &coarse_time);
+	if (err){
+        dev_dbg(&priv->i2c_client->dev, "%s failed at imx274_clamp_coarse_time\n", __func__);
+		goto fail;
+    }
+	/* prepare SHR registers */
+	imx274_calculate_coarse_time_regs(reg_list, coarse_time);
 
+	/* write to SHR registers */
 	for (i = 0; i < 2; i++) {
 		err = imx274_write_reg(priv->s_data, reg_list[i].addr,
-			 reg_list[i].val);
-		if (err)
-			goto fail;
+				       reg_list[i].val);
+		if (err){
+			dev_dbg(&priv->i2c_client->dev, "%s failed at imx274_write_reg\n", __func__);
+            goto fail;
+        }
 	}
-
-	return 0;
 
 fail:
 	dev_dbg(&priv->i2c_client->dev,
-		 "%s: COARSE_TIME control error\n", __func__);
+		"%s: COARSE_TIME control error\n", __func__);
 	return err;
 }
 
+/*
+ * imx274_verify_streaming - Function to verify sensor streaming
+ * @priv: Pointer to imx274 structure
+ *
+ * This is used to verify imx274 sensor output steaming
+ *
+ * Return: 0 on success, errors otherwise
+ */
 static int imx274_verify_streaming(struct imx274 *priv)
 {
 	int err = 0;
@@ -726,6 +979,14 @@ error:
 	return err;
 }
 
+/*
+ * imx274_s_ctrl - Function called for setting V4L2 control operations
+ * @ctrl: Pointer to V4L2 control structure
+ *
+ * This is used to set V4L2 control operations
+ *
+ * Return: 0 on success, errors otherwise
+ */
 static int imx274_s_ctrl(struct v4l2_ctrl *ctrl)
 {
 	struct imx274 *priv =
@@ -766,6 +1027,14 @@ static int imx274_s_ctrl(struct v4l2_ctrl *ctrl)
 	return err;
 }
 
+/*
+ * imx274_ctrls_init - Function to initialize V4L2 controls
+ * @priv: Pointer to imx274 structure
+ *
+ * This is used to initialize V4L2 controls for imx274 sensor
+ *
+ * Return: 0 on success, errors otherwise
+ */
 static int imx274_ctrls_init(struct imx274 *priv)
 {
 	struct i2c_client *client = priv->i2c_client;
@@ -819,14 +1088,81 @@ error:
 	return err;
 }
 
+/*
+ * imx274_open - Function to open camera device
+ * @fh: Pointer to V4L2 subdevice structure
+ *
+ * This function does nothing
+ *
+ * Return: 0 on success
+ */
+static int imx274_open(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
+{
+	struct i2c_client *client = v4l2_get_subdevdata(sd);
+
+	dev_dbg(&client->dev, "%s:\n", __func__);
+
+	return 0;
+}
+
+/*
+ * Media operations
+ */
+static const struct v4l2_subdev_video_ops imx274_subdev_video_ops = {
+	.s_stream	= imx274_s_stream,
+	.g_mbus_config	= camera_common_g_mbus_config,
+	.g_input_status	= imx274_g_input_status,
+};
+
+static const struct v4l2_subdev_core_ops imx274_subdev_core_ops = {
+	.s_power	= camera_common_s_power,
+};
+
+static const struct v4l2_subdev_pad_ops imx274_subdev_pad_ops = {
+	.set_fmt	= imx274_set_fmt,
+	.get_fmt	= imx274_get_fmt,
+	.enum_mbus_code = camera_common_enum_mbus_code,
+	.enum_frame_size        = camera_common_enum_framesizes,
+	.enum_frame_interval    = camera_common_enum_frameintervals,
+};
+
+static const struct v4l2_subdev_internal_ops imx274_subdev_internal_ops = {
+	.open = imx274_open,
+};
+
+static const struct media_entity_operations imx274_media_ops = {
+#ifdef CONFIG_MEDIA_CONTROLLER
+	.link_validate = v4l2_subdev_link_validate,
+#endif
+};
+
+static const struct v4l2_subdev_ops imx274_subdev_ops = {
+	.core	= &imx274_subdev_core_ops,
+	.video	= &imx274_subdev_video_ops,
+	.pad	= &imx274_subdev_pad_ops,
+};
+
+static const struct of_device_id imx274_of_match[] = {
+	{ .compatible = "nvidia,imx274" },
+	{ },
+};
 MODULE_DEVICE_TABLE(of, imx274_of_match);
 
+/*
+ * im274_parse_dt - Function to parse device tree
+ * @client: Pointer to I2C client structure
+ *
+ * This is used to parse imx274 device tree
+ *
+ * Return: Pointer to camera common pdata on success, NULL on error
+ */
 static struct camera_common_pdata *imx274_parse_dt(struct i2c_client *client)
 {
 	struct device_node *node = client->dev.of_node;
 	struct camera_common_pdata *board_priv_pdata;
 	const struct of_device_id *match;
 	int err;
+    int gpio;
 
 	if (!node)
 		return NULL;
@@ -844,7 +1180,6 @@ static struct camera_common_pdata *imx274_parse_dt(struct i2c_client *client)
 		return NULL;
 	}
 
-
 	err = camera_common_parse_clocks(client, board_priv_pdata);
 	if (err) {
 		dev_err(&client->dev, "Failed to find clocks\n");
@@ -856,15 +1191,24 @@ static struct camera_common_pdata *imx274_parse_dt(struct i2c_client *client)
 	if (err)
 		dev_err(&client->dev, "mclk not in DT\n");
 
-	board_priv_pdata->reset_gpio = of_get_named_gpio(node,
+	gpio = of_get_named_gpio(node,
 			"reset-gpios", 0);
-
-	of_property_read_string(node, "avdd-reg",
-			&board_priv_pdata->regulators.avdd);
-	of_property_read_string(node, "dvdd-reg",
-			&board_priv_pdata->regulators.dvdd);
-	of_property_read_string(node, "iovdd-reg",
-			&board_priv_pdata->regulators.iovdd);
+    if(gpio > 0) {
+		board_priv_pdata->reset_gpio = gpio;
+		err = gpio_request(board_priv_pdata->reset_gpio, "imx274_reset_gpio");
+		if (err)
+			dev_err(&client->dev,"gpio_request failed for gpio %d\n",board_priv_pdata->reset_gpio);
+		else {
+			err = gpio_direction_output(board_priv_pdata->reset_gpio, 1);
+			if (err) {
+				dev_err(&client->dev,"gpio_direction_output failed for gpio %d\n",board_priv_pdata->reset_gpio);
+				board_priv_pdata->reset_gpio = 0;
+			}
+		}
+	}
+	else {
+		board_priv_pdata->reset_gpio = 0;
+	}
 
 	return board_priv_pdata;
 
@@ -873,25 +1217,15 @@ error:
 	return NULL;
 }
 
-static int imx274_open(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
-{
-	struct i2c_client *client = v4l2_get_subdevdata(sd);
-	dev_dbg(&client->dev, "%s:\n", __func__);
-
-
-	return 0;
-}
-
-static const struct v4l2_subdev_internal_ops imx274_subdev_internal_ops = {
-	.open = imx274_open,
-};
-
-static const struct media_entity_operations imx274_media_ops = {
-#ifdef CONFIG_MEDIA_CONTROLLER
-	.link_validate = v4l2_subdev_link_validate,
-#endif
-};
-
+/*
+ * imx274 probe - Function called for I2C driver
+ * @client: Pointer to I2C client structure
+ * @id: Pointer to I2C device id structure
+ *
+ * This is used to probe imx274 sensor
+ *
+ * Return: 0 on success, errors otherwise
+ */
 static int imx274_probe(struct i2c_client *client,
 			const struct i2c_device_id *id)
 {
@@ -901,7 +1235,7 @@ static int imx274_probe(struct i2c_client *client,
 	char debugfs_name[10];
 	int err;
 
-	pr_info("[IMX274]: probing v4l2 sensor.\n");
+	dev_dbg(&client->dev, "Probing IMX274 sensor\n");
 
 	if (!IS_ENABLED(CONFIG_OF) || !node)
 		return -EINVAL;
@@ -970,7 +1304,7 @@ static int imx274_probe(struct i2c_client *client,
 	sprintf(debugfs_name, "imx274_%c", common_data->csi_port + 'a');
 	dev_dbg(&client->dev, "%s: name %s\n", __func__, debugfs_name);
 
-	camera_common_create_debugfs(common_data, "imx274");
+	camera_common_create_debugfs(common_data, debugfs_name);
 
 	v4l2_i2c_subdev_init(priv->subdev, client, &imx274_subdev_ops);
 
@@ -979,8 +1313,10 @@ static int imx274_probe(struct i2c_client *client,
 		return err;
 
 	err = imx274_verify_streaming(priv);
-	if (err)
-		return err;
+    // since CTI GPIO are not up during loading of the driver this will fail
+	//if (err)
+	//	return err;
+    
 
 	priv->subdev->internal_ops = &imx274_subdev_internal_ops;
 	priv->subdev->flags |= V4L2_SUBDEV_FL_HAS_DEVNODE |
@@ -1006,8 +1342,15 @@ static int imx274_probe(struct i2c_client *client,
 	return 0;
 }
 
-static int
-imx274_remove(struct i2c_client *client)
+/*
+ * imx274_remove - Function called for I2C driver
+ * @client: Pointer to I2C client structure
+ *
+ * This is used to remove imx274 sensor
+ *
+ * return: 0 one success
+ */
+static int imx274_remove(struct i2c_client *client)
 {
 	struct camera_common_data *s_data = to_camera_common_data(client);
 	struct imx274 *priv = (struct imx274 *)s_data->priv;
@@ -1024,11 +1367,13 @@ imx274_remove(struct i2c_client *client)
 	return 0;
 }
 
+/*
+ * Media related structure
+ */
 static const struct i2c_device_id imx274_id[] = {
 	{ "imx274", 0 },
 	{ }
 };
-
 MODULE_DEVICE_TABLE(i2c, imx274_id);
 
 static struct i2c_driver imx274_i2c_driver = {
@@ -1043,6 +1388,6 @@ static struct i2c_driver imx274_i2c_driver = {
 
 module_i2c_driver(imx274_i2c_driver);
 
-MODULE_DESCRIPTION("Media Controller driver for Sony IMX274");
-MODULE_AUTHOR("Josh Kuo <joshk@nvidia.com>");
+MODULE_DESCRIPTION("Media Controller driver for Sony IMX274 sensor");
+MODULE_AUTHOR("Leopard Imaging, Inc.");
 MODULE_LICENSE("GPL v2");
