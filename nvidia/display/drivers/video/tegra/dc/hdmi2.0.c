@@ -46,7 +46,7 @@
 #include "hdmivrr.h"
 
 #include <linux/tegra_prod.h>
-#include "../../../../arch/arm/mach-tegra/iomap.h"
+#include "../../../../../../arch/arm/mach-tegra/iomap.h"
 
 #include "hdmi2fpd_ds90uh949.h"
 #include "max929x_hdmi2gmsl.h"
