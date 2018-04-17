@@ -3,9 +3,9 @@ GCOV_PROFILE := y
 ccflags-y += -Idrivers/gpu/nvgpu/include
 ccflags-y += -Idrivers/video/tegra/host
 ccflags-y += -Idrivers/devfreq
-ccflags-y += -I../nvgpu/include
-ccflags-y += -I../nvgpu/include/uapi
-ccflags-y += -I../nvgpu/drivers/gpu/nvgpu/include
+ccflags-y += "nvidia/nvgpu/include
+ccflags-y += "nvidia/nvgpu/include/uapi
+ccflags-y += "nvidia/nvgpu/drivers/gpu/nvgpu/include
 ccflags-y += -Wno-multichar
 ccflags-y += -Werror
 ccflags-y += -Wno-error=cpp
