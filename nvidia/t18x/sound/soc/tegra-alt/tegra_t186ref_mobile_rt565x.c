@@ -43,7 +43,7 @@
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
 #include <sound/soc.h>
-#include "../codecs/rt5659.h"
+#include "nvidia/codecs/rt5659.h"
 
 #include "tegra_asoc_utils_alt.h"
 #include "tegra_asoc_machine_alt.h"

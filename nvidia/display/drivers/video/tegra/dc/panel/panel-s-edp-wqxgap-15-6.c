@@ -25,7 +25,7 @@
 #include <linux/leds.h>
 #include <linux/ioport.h>
 
-#include "../dc.h"
+#include "nvidia/dc.h"
 #include "board.h"
 #include "board-panel.h"
 #include "gpio-names.h"

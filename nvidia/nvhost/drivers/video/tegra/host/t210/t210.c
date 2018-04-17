@@ -45,7 +45,7 @@
 #include "isp/isp.h"
 #include "isp/isp_isr_v1.h"
 
-#include "../../../../arch/arm/mach-tegra/iomap.h"
+#include "nvidia/../../../arch/arm/mach-tegra/iomap.h"
 
 #include "chip_support.h"
 #include "nvhost_scale.h"

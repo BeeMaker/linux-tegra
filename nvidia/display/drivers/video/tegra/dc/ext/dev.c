@@ -31,17 +31,17 @@
 #include <trace/events/display.h>
 
 /* XXX ew */
-#include "../dc.h"
-#include "../dc_priv.h"
-#include "../dc_config.h"
+#include "nvidia/dc.h"
+#include "nvidia/dc_priv.h"
+#include "nvidia/dc_config.h"
 /* XXX ew 3 */
 #include "tegra_dc_ext_priv.h"
 /* XXX ew 4 */
 #ifdef CONFIG_TEGRA_GRHOST_SYNC
-#include "../drivers/staging/android/sync.h"
+#include "nvidia/drivers/staging/android/sync.h"
 #endif
 
-#include "../edid.h"
+#include "nvidia/edid.h"
 
 #define TEGRA_DC_TS_MAX_DELAY_US 1000000
 #define TEGRA_DC_TS_SLACK_US 2000

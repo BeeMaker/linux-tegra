@@ -20,7 +20,7 @@
 #include <linux/types.h>
 #include <linux/dma-buf.h>
 
-#include "../dc.h"
+#include "nvidia/dc.h"
 #include "tegra_dc_ext_priv.h"
 
 

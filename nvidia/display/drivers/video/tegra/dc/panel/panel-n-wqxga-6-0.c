@@ -21,7 +21,7 @@
 #include <linux/slab.h>
 #include <linux/delay.h>
 
-#include "../dc.h"
+#include "nvidia/dc.h"
 #include "board-panel.h"
 
 #define DSI_PANEL_RESET	1

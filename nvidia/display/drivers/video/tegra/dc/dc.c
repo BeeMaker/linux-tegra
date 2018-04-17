@@ -85,7 +85,7 @@ EXPORT_TRACEPOINT_SYMBOL(display_readl);
 
 
 /* HACK! This needs to come from DT */
-#include "../../../../arch/arm/mach-tegra/iomap.h"
+#include "nvidia/../../../arch/arm/mach-tegra/iomap.h"
 
 #define TEGRA_CRC_LATCHED_DELAY		34
 

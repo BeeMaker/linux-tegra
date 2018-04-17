@@ -26,7 +26,7 @@
 #include <linux/ioport.h>
 #include <linux/export.h>
 
-#include "../dc.h"
+#include "nvidia/dc.h"
 #include "board.h"
 #include "board-panel.h"
 #include "gpio-names.h"

@@ -50,7 +50,7 @@
 #include "mipical/mipi_cal.h"
 
 /* HACK! This needs to come from DT */
-#include "../../../../arch/arm/mach-tegra/iomap.h"
+#include "nvidia/../../../arch/arm/mach-tegra/iomap.h"
 
 #define APB_MISC_GP_MIPI_PAD_CTRL_0	(TEGRA_APB_MISC_BASE + 0x820)
 #define DSIB_MODE_ENABLE		0x2

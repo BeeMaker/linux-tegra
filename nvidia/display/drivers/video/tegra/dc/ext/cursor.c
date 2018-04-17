@@ -20,9 +20,9 @@
 #include "tegra_dc_ext_priv.h"
 
 /* ugh */
-#include "../dc.h"
-#include "../dc_priv.h"
-#include "../dc_reg.h"
+#include "nvidia/dc.h"
+#include "nvidia/dc_priv.h"
+#include "nvidia/dc_reg.h"
 
 int tegra_dc_ext_get_cursor(struct tegra_dc_ext_user *user)
 {

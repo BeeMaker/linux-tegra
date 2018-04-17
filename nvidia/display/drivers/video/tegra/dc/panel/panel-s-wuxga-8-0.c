@@ -20,7 +20,7 @@
 #include <linux/gpio.h>
 #include <linux/regulator/consumer.h>
 
-#include "../dc.h"
+#include "nvidia/dc.h"
 #include "board.h"
 #include "board-panel.h"
 
