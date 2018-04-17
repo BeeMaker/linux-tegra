@@ -27,7 +27,7 @@
 #include <linux/poll.h>
 #include <video/tegra_dc_ext.h>
 
-#include "nvidia/dc.h"
+#include "../dc.h"
 
 struct tegra_dc_ext;
 

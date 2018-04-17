@@ -24,7 +24,7 @@
 #include "sync_gk20a.h"
 
 #ifdef CONFIG_SYNC
-#include "nvidia/drivers/staging/android/sync.h"
+#include "../drivers/staging/android/sync.h"
 #endif
 
 #ifdef CONFIG_TEGRA_GK20A

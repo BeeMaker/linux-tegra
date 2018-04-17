@@ -34,7 +34,7 @@
 #include <linux/tick.h>
 #include <linux/irq.h>
 #include <linux/interrupt.h>
-#include "nvidia/../kernel/irq/internals.h"
+#include "../../kernel/irq/internals.h"
 #include <linux/pm_qos.h>
 #include <linux/cpu_pm.h>
 #include <linux/psci.h>
@@ -46,8 +46,8 @@
 #include <asm/cputype.h> /* cpuid */
 #include <asm/cpu.h>
 #include <asm/arch_timer.h>
-#include "nvidia/../drivers/cpuidle/dt_idle_states.h"
-#include "nvidia/../kernel/time/tick-internal.h"
+#include "../../drivers/cpuidle/dt_idle_states.h"
+#include "../../kernel/time/tick-internal.h"
 
 #define PSCI_STATE_ID_STATE_MASK        (0xf)
 #define PSCI_STATE_ID_WKTIM_MASK        (~0xf000000f)

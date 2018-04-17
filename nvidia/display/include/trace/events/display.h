@@ -26,7 +26,7 @@
 #if !defined(_TRACE_DISPLAY_H) || defined(TRACE_HEADER_MULTI_READ)
 #define _TRACE_DISPLAY_H
 
-#include "nvidia/../../drivers/video/tegra/dc/dc_priv_defs.h"
+#include "../../../drivers/video/tegra/dc/dc_priv_defs.h"
 #include <linux/tracepoint.h>
 
 DECLARE_EVENT_CLASS(display_basic_template,

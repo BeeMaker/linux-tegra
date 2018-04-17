@@ -29,7 +29,7 @@ struct nvhost_sync_timeline;
 struct nvhost_sync_pt;
 
 #ifdef CONFIG_TEGRA_GRHOST_SYNC
-#include "nvidia/drivers/staging/android/sync.h"
+#include "../drivers/staging/android/sync.h"
 
 struct nvhost_sync_timeline *nvhost_sync_timeline_create(
 		struct nvhost_syncpt *sp,

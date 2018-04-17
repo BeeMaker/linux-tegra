@@ -41,7 +41,7 @@
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0)
 #include <soc/tegra/virt/syscalls.h>
 #else
-#include "nvidia/../../drivers/virt/tegra/syscalls.h"
+#include "../../../drivers/virt/tegra/syscalls.h"
 #endif
 #endif
 

@@ -38,7 +38,7 @@ struct dbg_profiler_object_data;
 #include <linux/version.h>
 #include <linux/atomic.h>
 
-#include "nvidia/../../arch/arm/mach-tegra/iomap.h"
+#include "../../../arch/arm/mach-tegra/iomap.h"
 
 #include <nvgpu/acr/nvgpu_acr.h>
 

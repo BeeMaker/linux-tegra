@@ -27,7 +27,7 @@
 
 #include <asm/mach-types.h>
 
-#include "nvidia/dc.h"
+#include "../dc.h"
 #include "board-panel.h"
 #include "gpio-names.h"
 

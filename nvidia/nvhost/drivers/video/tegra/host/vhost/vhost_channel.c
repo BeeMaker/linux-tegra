@@ -17,7 +17,7 @@
  */
 
 #include "vhost.h"
-#include "nvidia/host1x/host1x.h"
+#include "../host1x/host1x.h"
 
 u32 vhost_channel_alloc_clientid(u64 handle, u32 id)
 {

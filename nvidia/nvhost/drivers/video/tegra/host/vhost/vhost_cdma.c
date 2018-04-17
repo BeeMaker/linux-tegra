@@ -18,11 +18,11 @@
 
 #include <linux/slab.h>
 #include "vhost.h"
-#include "nvidia/host1x/host1x.h"
-#include "nvidia/nvhost_cdma.h"
-#include "nvidia/nvhost_job.h"
-#include "nvidia/dev.h"
-#include "nvidia/bus_client.h"
+#include "../host1x/host1x.h"
+#include "../nvhost_cdma.h"
+#include "../nvhost_job.h"
+#include "../dev.h"
+#include "../bus_client.h"
 
 static int vhost_pb_sendrecv(struct tegra_vhost_cmd_msg *msg, size_t size_in,
 		size_t size_out)

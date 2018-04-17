@@ -25,7 +25,7 @@
 #include <linux/backlight.h>
 #include <linux/pwm_backlight.h>
 
-#include "nvidia/dc.h"
+#include "../dc.h"
 #include <asm/mach-types.h>
 
 #include "board-panel.h"

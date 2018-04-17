@@ -18,7 +18,7 @@
 
 #include "nvhost_syncpt.h"
 #include "vhost.h"
-#include "nvidia/host1x/host1x.h"
+#include "../host1x/host1x.h"
 
 #define INVALID_REG_VAL 0xdeadcafe
 

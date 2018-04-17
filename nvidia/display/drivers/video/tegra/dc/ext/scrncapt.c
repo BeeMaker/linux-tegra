@@ -29,9 +29,9 @@
 #include <video/tegra_dc_ext.h>
 #include <trace/events/display.h>
 
-#include "nvidia/dc.h"
-#include "nvidia/dc_priv.h"
-#include "nvidia/dc_config.h"
+#include "../dc.h"
+#include "../dc_priv.h"
+#include "../dc_config.h"
 #include "tegra_dc_ext_priv.h"
 
 

@@ -34,7 +34,7 @@
 #include "tegra_asoc_machine_alt_t18x.h"
 #include "tegra186_xbar_alt.h"
 
-#include "nvidia/codecs/rt5659.h"
+#include "../codecs/rt5659.h"
 
 #define DRV_NAME "t186-p4573-audio"
 

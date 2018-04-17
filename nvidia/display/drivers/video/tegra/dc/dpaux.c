@@ -25,7 +25,7 @@
 #include "dpaux.h"
 #include "dp.h"
 #include "hdmi2.0.h"
-#include "nvidia/../../../arch/arm/mach-tegra/iomap.h"
+#include "../../../../arch/arm/mach-tegra/iomap.h"
 
 static DEFINE_MUTEX(dpaux_lock);
 

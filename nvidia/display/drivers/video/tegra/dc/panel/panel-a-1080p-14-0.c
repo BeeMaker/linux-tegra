@@ -20,7 +20,7 @@
 #include <linux/delay.h>
 #include <linux/regulator/consumer.h>
 
-#include "nvidia/dc.h"
+#include "../dc.h"
 #include "board.h"
 #include "board-panel.h"
 

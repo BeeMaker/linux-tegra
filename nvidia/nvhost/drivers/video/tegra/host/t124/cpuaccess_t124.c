@@ -19,8 +19,8 @@
  * 51 Franklin St - Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-#include "nvidia/nvhost_cpuaccess.h"
-#include "nvidia/dev.h"
+#include "../nvhost_cpuaccess.h"
+#include "../dev.h"
 
 #include "t124.h"
 #include "hardware_t124.h"

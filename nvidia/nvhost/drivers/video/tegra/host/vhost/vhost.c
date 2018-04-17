@@ -21,7 +21,7 @@
 #include <linux/tegra_vhost.h>
 
 #include "vhost.h"
-#include "nvidia/host1x/host1x.h"
+#include "../host1x/host1x.h"
 
 static inline int vhost_comm_init(struct platform_device *pdev,
 					  bool channel_management_in_guest)
