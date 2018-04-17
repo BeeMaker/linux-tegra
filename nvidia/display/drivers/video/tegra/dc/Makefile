@@ -1,6 +1,6 @@
 GCOV_PROFILE := y
 subdir-ccflags-y := -Werror
-EXTRA_CFLAGS += "nvidia/nvhost/drivers/video/tegra/host
+EXTRA_CFLAGS += -Invidia/nvhost/drivers/video/tegra/host
 EXTRA_CFLAGS += -Idrivers/video/tegra/host
 ifeq ($(CONFIG_TEGRA_NVDISPLAY),y)
 ccflags-y += -I$(srctree)/nvidia/t18x/drivers/video/tegra/dc
