@@ -217,6 +217,8 @@
 
 #define MCP251X_OST_DELAY_MS	(5)
 
+#define MCP251X_CLK_RATE    20000000
+
 #define DEVICE_NAME "mcp251x"
 
 static int mcp251x_enable_dma; /* Enable SPI DMA. Default: 0 (Off) */
@@ -1043,6 +1045,7 @@ static int mcp251x_can_probe(struct spi_device *spi)
 		freq = clk_get_rate(clk);
 	}
 
+	freq = MCP251X_CLK_RATE;
 	/* Sanity check */
 	if (freq < 1000000 || freq > 25000000)
 		return -ERANGE;

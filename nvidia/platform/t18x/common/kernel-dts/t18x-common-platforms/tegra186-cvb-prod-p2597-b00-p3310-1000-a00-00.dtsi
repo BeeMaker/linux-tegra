@@ -174,7 +174,7 @@
 			regulator-name = "en-vdd-ts-1v8";
 			regulator-min-microvolt = <1800000>;
 			regulator-max-microvolt = <1800000>;
-			gpio = <&gpio_i2c_0_74 1 1>;
+			/*gpio = <&gpio_i2c_0_74 1 1>;*/
 			enable-active-high;
 			regulator-always-on;
 			regulator-boot-on;

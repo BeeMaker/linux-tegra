@@ -2843,7 +2843,9 @@ static int tegra_pcie_init(struct tegra_pcie *pcie)
 	if (!pcie->num_ports) {
 		dev_info(pcie->dev, "PCIE: no end points detected\n");
 		err = -ENODEV;
-		goto fail_power_off;
+        //Do not power off so USB based mPCIe cards still work
+        return err;
+		//goto fail_power_off;
 	}
 	if (IS_ENABLED(CONFIG_PCI_MSI)) {
 		err = tegra_pcie_enable_msi(pcie, false);
@@ -4568,7 +4570,8 @@ static void pcie_delayed_detect(struct work_struct *work)
 #endif
 	ret = tegra_pcie_probe_complete(pcie);
 	if (ret || !pcie->num_ports) {
-		pm_runtime_put_sync(pcie->dev);
+		//Do not power off so USB based mPCIe cards still work
+        //pm_runtime_put_sync(pcie->dev);
 		pm_runtime_disable(pcie->dev);
 		tegra_pd_remove_device(pcie->dev);
 		goto release_regulators;
