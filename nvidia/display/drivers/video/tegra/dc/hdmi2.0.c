@@ -1244,6 +1244,7 @@ static int tegra_dc_hdmi_init(struct tegra_dc *dc)
 	int sor_num = tegra_dc_which_sor(dc);
 	struct device_node *np_hdmi = NULL;
 	struct device_node *np_panel = NULL;
+    int i;
 
 	np_hdmi = of_find_node_by_path(
 			sor_num ? SOR1_NODE : SOR_NODE);
@@ -1374,12 +1375,37 @@ static int tegra_dc_hdmi_init(struct tegra_dc *dc)
 			((dc->pdata->flags & TEGRA_DC_FLAG_ENABLED) &&
 			 (dc->pdata->flags & TEGRA_DC_FLAG_SET_EARLY_MODE))) &&
 			dc->out && (dc->out->type == TEGRA_DC_OUT_HDMI)) {
+
 		struct fb_monspecs specs;
+        struct fb_videomode* mode = NULL;
+
 		if (tegra_dc_hpd(dc) && (!dc->initialized)) {
 			/* Unpowergate DC before reading EDID */
 			tegra_dc_unpowergate_locked(hdmi->dc);
-			if (!tegra_edid_get_monspecs(hdmi->edid, &specs))
-				tegra_dc_set_fb_mode(dc, specs.modedb, false);
+			if (!tegra_edid_get_monspecs(hdmi->edid, &specs)){
+
+                //Sometimes a monitor will have a non-compliant mode as its default mode
+                //this would cause the Jetson to hang on boot when the non-compliant monitor
+                //was connected.  Filter all the modes to clean them up and make them compliant
+
+                for(i=0;i<specs.modedb_len;i++){
+                    //get first usable mode advertised in EDID 
+                    if(tegra_hdmi_fb_mode_filter(dc,&specs.modedb[i])){
+                        dev_dbg(&dc->ndev->dev,"hdmi: Compliant mode found! Mode:%d",i);
+                        mode = &specs.modedb[i];
+                        break; 
+                    }
+                }
+                
+                if(mode){                
+    				tegra_dc_set_fb_mode(dc, mode, false);
+                }
+                else{
+                    dev_warn(&dc->ndev->dev,"hdmi: No useable modes found for monitor, falling back to VGA\n");
+                    //last hope, fall back to VGA mode
+                    tegra_dc_set_fb_mode(dc, &tegra_dc_vga_mode, false);
+                }
+            }
 			else {
 			/* if for some reason there is no edid upon hotplug */
 				tegra_dc_set_fb_mode(dc,
@@ -2665,6 +2691,7 @@ static void tegra_dc_hdmi_disable(struct tegra_dc *dc)
 
 	_tegra_hdmivrr_activate(hdmi, false);
 
+	tegra_hda_reset_data(dc);
 	if (NULL != hdmi->out_ops && NULL != hdmi->out_ops->disable)
 		hdmi->out_ops->disable(hdmi);
 
@@ -2675,7 +2702,6 @@ static void tegra_dc_hdmi_disable(struct tegra_dc *dc)
 #endif
 
 	tegra_hdmi_controller_disable(hdmi);
-	tegra_hda_reset_data(dc);
 
 	return;
 }

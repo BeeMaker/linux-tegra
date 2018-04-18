@@ -2025,6 +2025,9 @@ static int tegra_dc_ext_set_lut(struct tegra_dc_ext_user *user,
 	struct tegra_dc_lut *lut;
 	struct tegra_dc_win *win = tegra_dc_get_window(dc, index);
 
+	if (!dc->enabled || dc->shutdown)
+		return -EINVAL;
+
 	if (!win)
 		return -EINVAL;
 
