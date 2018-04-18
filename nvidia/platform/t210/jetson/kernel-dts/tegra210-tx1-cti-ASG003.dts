@@ -85,4 +85,4 @@
 };
 
 #include <t210-common-overrides/tegra210-power-dvfs-override-ucm2c.dtsi>
-
+#include <tegra210-tx1-cti-ASG003-magia.dtsi>
