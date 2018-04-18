@@ -242,7 +242,8 @@ static int pca954x_probe(struct i2c_client *client,
 		return -ENOMEM;
 
 	i2c_set_clientdata(client, data);
-
+	printk("%s\n",__func__);
+	
 	if (client->dev.of_node) {
 		ret = of_property_read_string(client->dev.of_node, "vcc_lp",
 					&data->lp_reg_name);
@@ -251,14 +252,17 @@ static int pca954x_probe(struct i2c_client *client,
 							data->lp_reg_name);
 			if (IS_ERR(data->lp_reg)) {
 				dev_info(&client->dev, "lp_reg get fail\n");
-				return -ENOMEM;
+				//return -ENOMEM;
+				data->lp_reg = NULL;
+				data->lp_reg_name = NULL;
 			}
-
-			ret = regulator_enable(data->lp_reg);
-			if (ret) {
-				dev_err(&client->dev, "%s: lp_reg failed to enable\n",
-					__func__);
-				return -ENOMEM;
+			if(data->lp_reg) {
+				ret = regulator_enable(data->lp_reg);
+				if (ret) {
+					dev_err(&client->dev, "%s: lp_reg failed to enable\n",
+						__func__);
+					return -ENOMEM;
+				}
 			}
 		} else
 			data->lp_reg_name = NULL;
@@ -293,7 +297,8 @@ static int pca954x_probe(struct i2c_client *client,
 	else if (IS_ERR(data->vcc_reg)) {
 		ret = PTR_ERR(data->vcc_reg);
 		dev_err(&client->dev, "vcc regualtor get failed, %d\n", ret);
-		return ret;
+		//return ret;
+		data->vcc_reg = NULL;
 	}
 
 	/* Get regulator pointer for pca954x vcc-pullup */
@@ -453,7 +458,8 @@ static int __init pca954x_init(void)
 {
 	return i2c_add_driver(&pca954x_driver);
 }
-fs_initcall(pca954x_init);
+module_init(pca954x_init);
+//fs_initcall(pca954x_init);
 
 static void __exit pca954x_exit(void)
 {

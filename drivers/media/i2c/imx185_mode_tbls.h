@@ -21,6 +21,9 @@
 #include <media/camera_common.h>
 #include <linux/miscdevice.h>
 
+/*
+ * define register table operation macro
+ */
 #define IMX185_TABLE_WAIT_MS	0
 #define IMX185_TABLE_END	1
 #define IMX185_MAX_RETRIES	3
@@ -33,6 +36,9 @@
 
 #define imx185_reg struct reg_8
 
+/*
+ * starting stream
+ */
 static imx185_reg imx185_start[] = {
 	{0x3000, 0x00 },
 	{IMX185_TABLE_WAIT_MS, IMX185_WAIT_MS_START},
@@ -42,12 +48,18 @@ static imx185_reg imx185_start[] = {
 	{ IMX185_TABLE_END, 0x00 }
 };
 
+/*
+ * imx185 register configuration for stoping stream
+ */
 static imx185_reg imx185_stop[] = {
 	{0x3000, 0x01 },
 	{IMX185_TABLE_WAIT_MS, IMX185_WAIT_MS_STOP},
 	{IMX185_TABLE_END, 0x00 }
 };
 
+/*
+ * imx185 register configuration for top colorbars
+ */
 static imx185_reg tp_colorbars[] = {
 	{0x300A, 0x00},/*BLC for PG*/
 	{0x300E, 0x00},
@@ -63,6 +75,10 @@ static imx185_reg tp_colorbars[] = {
 	{IMX185_TABLE_END, 0x00}
 };
 
+/*
+ * imx185 crop(refer to datasheet) register configuration with
+ * 1920x1080 resolution 60fps, raw10 data and mipi four lane output
+ */
 static  imx185_reg imx185_1920x1080_crop_60fps[] = {
 	{0x3002, 0x01},
 	{0x3005, 0x01},
@@ -236,7 +252,10 @@ static  imx185_reg imx185_1920x1080_crop_60fps[] = {
 #endif
 	{IMX185_TABLE_END, 0x00}
 };
-
+/*
+ * imx185 crop(refer to datasheet) register configuration with
+ * 1920x1080 resolution 30fps, raw10 data and mipi four lane output
+ */
 static  imx185_reg imx185_1920x1080_crop_30fps[] = {
 	{0x3002, 0x01},
 	{0x3005, 0x01},
@@ -408,7 +427,10 @@ static  imx185_reg imx185_1920x1080_crop_30fps[] = {
 #endif
 	{IMX185_TABLE_END, 0x00}
 };
-
+/*
+ * imx185 crop(refer to datasheet) register configuration with
+ * 1920x1080 resolution hdr 30fps, raw10 data and mipi four lane output
+ */
 static imx185_reg imx185_1920x1080_hdr_crop_30fps[] = {
 	{0x3002, 0x01},
 	{0x3005, 0x01},
@@ -612,7 +634,10 @@ static imx185_reg imx185_1920x1080_hdr_crop_30fps[] = {
 	{0x3065, 0x00},
 	{IMX185_TABLE_END, 0x00}
 };
-
+/*
+ * imx185 crop(refer to datasheet) register configuration with
+ * 1920x1080 resolution 10bit 60fps, raw10 data and mipi four lane output
+ */
 static imx185_reg imx185_1920x1080_crop_10bit_60fps[] = {
 	{0x3002, 0x01},
 	{0x3005, 0x00},/*10BIT*/
@@ -786,7 +811,10 @@ static imx185_reg imx185_1920x1080_crop_10bit_60fps[] = {
 #endif
 	{IMX185_TABLE_END, 0x00}
 };
-
+/*
+ * imx185 crop(refer to datasheet) register configuration with
+ * 1920x1080 resolution 10bit 30fps, raw10 data and mipi four lane output
+ */
 static imx185_reg imx185_1920x1080_crop_10bit_30fps[] = {
 	{0x3002, 0x01},
 	{0x3005, 0x00},
@@ -994,16 +1022,22 @@ static const int imx185_60fps[] = {
 	60,
 };
 
+static const int imx185_120fps[] = {
+	120,
+};
+
 static const struct camera_common_frmfmt imx185_frmfmt[] = {
 	{{1920, 1080}, imx185_30fps, 1, 0,
-			IMX185_MODE_1920X1080_CROP_30FPS},
+	IMX185_MODE_1920X1080_CROP_30FPS},
 	{{1920, 1080}, imx185_30fps, 1, 0,
-			IMX185_MODE_1920X1080_CROP_10BIT_30FPS},
+	IMX185_MODE_1920X1080_CROP_10BIT_30FPS},
 	{{1920, 1080}, imx185_60fps, 1, 0,
-			IMX185_MODE_1920X1080_CROP_60FPS},
+	IMX185_MODE_1920X1080_CROP_60FPS},
 	{{1920, 1080}, imx185_60fps, 1, 0,
-			IMX185_MODE_1920X1080_CROP_10BIT_60FPS},
+	IMX185_MODE_1920X1080_CROP_10BIT_60FPS},
 	{{1920, 1080}, imx185_30fps, 1, 1,
-			IMX185_MODE_1920X1080_CROP_HDR_30FPS},
+	IMX185_MODE_1920X1080_CROP_HDR_30FPS},
+	{{1280, 720}, imx185_120fps, 1, 0,
+	IMX185_MODE_1280X720_CROP_10BIT_120FPS},
 };
 #endif /* __IMX185_I2C_TABLES__ */
