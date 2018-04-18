@@ -5,6 +5,6 @@
 
 / {
     i2c@7000c400 {
-        clock-frequency = <1000000>; /* Was 400000 */
+        clock-frequency = <400000>; /* Was 400000 */
     };
 };
