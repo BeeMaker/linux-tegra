@@ -289,7 +289,7 @@ static int pca954x_probe(struct i2c_client *client,
 			"skip_mux_detect");
 	if (fskip)
 		dev_info(&client->dev, "device detect skipped.\n");
-
+	
 	/* Get regulator pointer for pca954x vcc */
 	data->vcc_reg = devm_regulator_get(&client->dev, "vcc");
 	if (PTR_ERR(data->vcc_reg) == -EPROBE_DEFER)
@@ -327,7 +327,7 @@ static int pca954x_probe(struct i2c_client *client,
 			return ret;
 		}
 	}
-
+	
 	/*
 	 * Power-On Reset takes time.
 	 * I2C is ready after Power-On Reset.
