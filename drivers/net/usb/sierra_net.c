@@ -943,6 +943,7 @@ static const struct usb_device_id products[] = {
 	DIRECT_IP_DEVICE(0x1199, 0x68A3), /* Sierra Wireless USB-to-WWAN modem */
 	DIRECT_IP_DEVICE(0x0F3D, 0x68A3), /* AT&T Direct IP modem */
 	DIRECT_IP_DEVICE(0x1199, 0x68AA), /* Sierra Wireless Direct IP LTE modem */
+	DIRECT_IP_DEVICE(0x1199, 0x683C), /* Sierra Wireless MC8790 */
 	DIRECT_IP_DEVICE(0x0F3D, 0x68AA), /* AT&T Direct IP LTE modem */
 
 	{}, /* last item */

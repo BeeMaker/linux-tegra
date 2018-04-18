@@ -29,69 +29,118 @@
 #include <media/tegra_v4l2_camera.h>
 #include <media/camera_common.h>
 #include "imx185_mode_tbls.h"
-
+/* default mode */
 #define IMX185_DEFAULT_MODE	IMX185_MODE_1920X1080_CROP_30FPS
+/* default image data format */
 #define IMX185_DEFAULT_DATAFMT	MEDIA_BUS_FMT_SRGGB12_1X12
-
+/* minimum frame length */
 #define IMX185_MIN_FRAME_LENGTH	(1125)
+/* maximum frame length */
 #define IMX185_MAX_FRAME_LENGTH	(0x1FFFF)
+/* minimum SHS1 */
 #define IMX185_MIN_SHS1_1080P_HDR	(5)
+/* minimum SHS2 */
 #define IMX185_MIN_SHS2_1080P_HDR	(82)
+/* maximum SHS2 */
 #define IMX185_MAX_SHS2_1080P_HDR	(IMX185_MAX_FRAME_LENGTH - 5)
+/* maximum SHS1 */
 #define IMX185_MAX_SHS1_1080P_HDR	(IMX185_MAX_SHS2_1080P_HDR / 16)
 
+/* msb frame length add */
 #define IMX185_FRAME_LENGTH_ADDR_MSB		0x301A
+/* mid frame length add */
 #define IMX185_FRAME_LENGTH_ADDR_MID		0x3019
+/* lsb frame length add */
 #define IMX185_FRAME_LENGTH_ADDR_LSB		0x3018
+/* shs1 msb coarse time */
 #define IMX185_COARSE_TIME_SHS1_ADDR_MSB	0x3022
+/* shs1 nid coarse time */
 #define IMX185_COARSE_TIME_SHS1_ADDR_MID	0x3021
+/* shs1 lsb coarse time */
 #define IMX185_COARSE_TIME_SHS1_ADDR_LSB	0x3020
+/* shs2 msb coarse time */
 #define IMX185_COARSE_TIME_SHS2_ADDR_MSB	0x3025
+/* shs2 mid coarse time */
 #define IMX185_COARSE_TIME_SHS2_ADDR_MID	0x3024
+/* shs2 lsb coarse time */
 #define IMX185_COARSE_TIME_SHS2_ADDR_LSB	0x3023
-#define IMX185_GAIN_ADDR					0x3014
-#define IMX185_GROUP_HOLD_ADDR				0x3001
-#define IMX185_SW_RESET_ADDR			0x3003
+#define IMX185_GAIN_ADDR			0x3014 /* GAIN ADDR */
+#define IMX185_GROUP_HOLD_ADDR			0x3001 /* REG HOLD */
+#define IMX185_SW_RESET_ADDR			0x3003 /* SW RESET */
 
-#define IMX185_FUSE_ID_ADDR	0x3382
-#define IMX185_FUSE_ID_SIZE	6
-#define IMX185_FUSE_ID_STR_SIZE	(IMX185_FUSE_ID_SIZE * 2)
+#define IMX185_FUSE_ID_ADDR	0x3382	/* FUSE ADDR */
+#define IMX185_FUSE_ID_SIZE	6       /* FUSE SIZE */
+#define IMX185_FUSE_ID_STR_SIZE	(IMX185_FUSE_ID_SIZE * 2) /* FUSE STR SEZE */
+/* default image output width */
 #define IMX185_DEFAULT_WIDTH	1920
+/* default image output height */
 #define IMX185_DEFAULT_HEIGHT	1080
+/* default output clk frequency for camera */
 #define IMX185_DEFAULT_CLK_FREQ	37125000
 
+/*
+ * struct imx185 - imx185 structure
+ * @power: Camera common power rail structure
+ * @numctrls: The num of V4L2 control
+ * @i2c_client: Pointer to I2C client
+ * @subdev: Pointer to V4L2 subdevice structure
+ * @pad: Media pad structure
+ * @group_hold_prev: Group hold status
+ * @group_hold_en: Enable/Disable group hold
+ * @regmap: Pointer to regmap structure
+ * @s_data: Pointer to camera common data structure
+ * @p_data: Pointer to camera common pdata structure
+ * @ctrls: Pointer to V4L2 control list
+ */
 struct imx185 {
 	struct camera_common_power_rail	power;
-	int	numctrls;
+	int				numctrls;
 	struct v4l2_ctrl_handler	ctrl_handler;
-	struct i2c_client	*i2c_client;
-	struct v4l2_subdev	*subdev;
-	struct media_pad	pad;
+	struct i2c_client		*i2c_client;
+	struct v4l2_subdev		*subdev;
+	struct media_pad		pad;
 	u32				frame_length;
-	s32	group_hold_prev;
-	bool	group_hold_en;
-	s64 last_wdr_et_val;
-	struct regmap	*regmap;
+	s32				group_hold_prev;
+	bool				group_hold_en;
+	s64				last_wdr_et_val;
+	struct regmap			*regmap;
 	struct camera_common_data	*s_data;
 	struct camera_common_pdata	*pdata;
 	struct v4l2_ctrl		*ctrls[];
 };
 
+/*
+ * struct sensror_regmap_config - sensor regmap config structure
+ * @reg_bits: Sensor register address width
+ * @val_bits: Sensor register value width
+ * @cache_type: Cache type
+ * @use_single_rw: Indicate only read or write a single time
+ */
 static const struct regmap_config sensor_regmap_config = {
-	.reg_bits = 16,
-	.val_bits = 8,
-	.cache_type = REGCACHE_RBTREE,
-	.use_single_rw = true,
+	.reg_bits	= 16,
+	.val_bits	= 8,
+	.cache_type	= REGCACHE_RBTREE,
+	.use_single_rw	= true,
 };
-
+/*
+ * Function declaration
+ */
 static int imx185_g_volatile_ctrl(struct v4l2_ctrl *ctrl);
 static int imx185_s_ctrl(struct v4l2_ctrl *ctrl);
 
+/*
+ * imx185 V4L2 control operator
+ */
 static const struct v4l2_ctrl_ops imx185_ctrl_ops = {
 	.g_volatile_ctrl = imx185_g_volatile_ctrl,
 	.s_ctrl = imx185_s_ctrl,
 };
 
+/*
+ * V4L2 control configuration list
+ * the control Items includes gain, exposure,
+ * frame rate, group hold and HDR
+ */
 static struct v4l2_ctrl_config ctrl_config_list[] = {
 /* Do not change the name field for the controls! */
 	{
@@ -171,7 +220,14 @@ static struct v4l2_ctrl_config ctrl_config_list[] = {
 		.step = 1,
 	},
 };
-
+/*
+ * imx185_get_frame_legnth_regs - Function for get frame length
+ * register value
+ * @regs: Pointer to imx185 reg structure
+ * @frame_length: Frame length value
+ *
+ * This is used to get the frame length value for frame length register
+ */
 static inline void imx185_get_frame_length_regs(imx185_reg *regs,
 				u32 frame_length)
 {
@@ -185,6 +241,15 @@ static inline void imx185_get_frame_length_regs(imx185_reg *regs,
 	(regs + 2)->val = (frame_length) & 0xff;
 }
 
+
+/*
+ * imx185_get_coarse_time_regs_shs1 - Function for get coarse time
+ * register value
+ * @regs: Pointer to get reg structure
+ * @coarse_time: Coarse time value
+ *
+ * This is used to get the coarse time value by shs1 for coarse time register
+ */
 static inline void imx185_get_coarse_time_regs_shs1(imx185_reg *regs,
 				u32 coarse_time)
 {
@@ -199,6 +264,14 @@ static inline void imx185_get_coarse_time_regs_shs1(imx185_reg *regs,
 
 }
 
+/*
+ * imx185_get_coarse_time_regs_shs2 - Function for get coarse time
+ * register value
+ * @regs: Pointer to get reg structure
+ * @coarse_time: Coarse time value
+ *
+ * This is used to get the coarse time value by shs2 for coarse time register
+ */
 static inline void imx185_get_coarse_time_regs_shs2(imx185_reg *regs,
 				u32 coarse_time)
 {
@@ -213,6 +286,14 @@ static inline void imx185_get_coarse_time_regs_shs2(imx185_reg *regs,
 
 }
 
+/*
+ * imx185_get_gain_regs - Function for get gain
+ * register value
+ * @regs: Pointer to imx185 reg structure
+ * @gain: Gain value
+ *
+ * This is used to get the gain value for gain register
+ */
 static inline void imx185_get_gain_reg(imx185_reg *regs,
 				u8 gain)
 {
@@ -223,6 +304,16 @@ static inline void imx185_get_gain_reg(imx185_reg *regs,
 static int test_mode;
 module_param(test_mode, int, 0644);
 
+/*
+ * imx185_read_reg - Function for reading register value
+ * @s_data: Pointer to camera common data structure
+ * @addr: Registr address
+ * @val: Pointer to register value
+ *
+ * This function is used to read a register value for imx185
+ *
+ * Return: 0 on success, errors otherwise
+ */
 static inline int imx185_read_reg(struct camera_common_data *s_data,
 				u16 addr, u8 *val)
 {
@@ -236,6 +327,16 @@ static inline int imx185_read_reg(struct camera_common_data *s_data,
 	return err;
 }
 
+/*
+ * imx185_write_reg - Function for writing register value
+ * @s_data: Pointer to camera common data structure
+ * @addr: Registr address
+ * @val: Register value
+ *
+ * This function is used to write a register value for imx185
+ *
+ * Return: 0 on success, errors otherwise
+ */
 static int imx185_write_reg(struct camera_common_data *s_data,
 				u16 addr, u8 val)
 {
@@ -249,7 +350,15 @@ static int imx185_write_reg(struct camera_common_data *s_data,
 
 	return err;
 }
-
+/*
+ * regmap_util_write_table_8 - Function for writing register table
+ * @priv: Pointer to imx185 structure
+ * @table: Table containing register values
+ *
+ * This is used to write register table into sensor's reg map.
+ *
+ * Return: 0 on success, errors otherwise
+ */
 static int imx185_write_table(struct imx185 *priv,
 				const imx185_reg table[])
 {
@@ -259,14 +368,47 @@ static int imx185_write_table(struct imx185 *priv,
 					 IMX185_TABLE_WAIT_MS,
 					 IMX185_TABLE_END);
 }
-
+/*
+ * imx185_power_on - Function to power on the camera
+ * @s_data: Pointer to camera common data
+ *
+ * This is used to power on imx185 camera board
+ *
+ * Return: 0 on success, errors otherwise
+ */
 static int imx185_power_on(struct camera_common_data *s_data)
 {
 	int err = 0;
 	struct imx185 *priv = (struct imx185 *)s_data->priv;
 	struct camera_common_power_rail *pw = &priv->power;
+	struct device_node *node = priv->i2c_client->dev.of_node;	
+	int gpio;
 
 	dev_dbg(&priv->i2c_client->dev, "%s: power on\n", __func__);
+	
+	if(!pw->reset_gpio) {		
+		gpio = of_get_named_gpio(node, "reset-gpios", 0);
+		if (gpio < 0) {
+			/* reset-gpio is not absolutely needed */
+			dev_dbg(&priv->i2c_client->dev, "reset gpios not in DT 0x%x \n", gpio);
+			gpio = 0;
+		}
+		pw->reset_gpio = (unsigned int)gpio;	
+		err = gpio_request(pw->reset_gpio, "imx185_reset_gpio");	
+		if (err) {
+			pw->reset_gpio = 0;
+			pr_err("%s gpio_request failed err 0x%x\n", __func__, err);
+		}
+		else {
+			err = gpio_direction_output(pw->reset_gpio, 1);
+			if (err) {
+				pr_err("%s gpio_direction_output failed err %d.\n", __func__, err);
+				pw->reset_gpio = 0;
+			}
+		}
+	}
+	
+	
 	if (priv->pdata && priv->pdata->power_on) {
 		err = priv->pdata->power_on(pw);
 		if (err)
@@ -278,9 +420,9 @@ static int imx185_power_on(struct camera_common_data *s_data)
 
 	/*exit reset mode: XCLR */
 	if (pw->reset_gpio) {
-		gpio_set_value(pw->reset_gpio, 0);
+		gpio_set_value_cansleep(pw->reset_gpio, 0);
 		usleep_range(30, 50);
-		gpio_set_value(pw->reset_gpio, 1);
+		gpio_set_value_cansleep(pw->reset_gpio, 1);
 		usleep_range(30, 50);
 	}
 
@@ -288,7 +430,14 @@ static int imx185_power_on(struct camera_common_data *s_data)
 	return 0;
 
 }
-
+/*
+ * imx185_power_off - Function to power off the camera
+ * @s_data: Pointer to camera common data
+ *
+ * This is used to power off imx185 camera board
+ *
+ * Return: 0 on success, errors otherwise
+ */
 static int imx185_power_off(struct camera_common_data *s_data)
 {
 	int err = 0;
@@ -308,7 +457,7 @@ static int imx185_power_off(struct camera_common_data *s_data)
 	/* enter reset mode: XCLR */
 	usleep_range(1, 2);
 	if (pw->reset_gpio)
-		gpio_set_value(pw->reset_gpio, 0);
+		gpio_set_value_cansleep(pw->reset_gpio, 0);
 
 power_off_done:
 	pw->state = SWITCH_OFF;
@@ -316,6 +465,14 @@ power_off_done:
 	return 0;
 }
 
+/*
+ * imx185_power_get - Function to get power
+ * @priv: Pointer to imx185 structure
+ *
+ * This is used to get power from tegra
+ *
+ * Return: 0 on success, errors otherwise
+ */
 static int imx185_power_get(struct imx185 *priv)
 {
 	struct camera_common_power_rail *pw = &priv->power;
@@ -344,13 +501,25 @@ static int imx185_power_get(struct imx185 *priv)
 	pw->state = SWITCH_OFF;
 	return err;
 }
-
+/*
+ * Function declaration
+ */
 static int imx185_set_coarse_time(struct imx185 *priv, s64 val);
 static int imx185_set_coarse_time_hdr(struct imx185 *priv, s64 val);
 static int imx185_set_gain(struct imx185 *priv, s64 val);
 static int imx185_set_frame_rate(struct imx185 *priv, s64 val);
 static int imx185_set_exposure(struct imx185 *priv, s64 val);
 
+/*
+ * imx185_s_stream - It is used to start/stop the streaming.
+ * @sd: V4L2 Sub device
+ * @enable: Flag (True / False)
+ *
+ * This function controls the start or stop of streaming for the
+ * imx185 sensor.
+ *
+ * Return: 0 on success, errors otherwise
+ */
 static int imx185_s_stream(struct v4l2_subdev *sd, int enable)
 {
 	struct i2c_client *client = v4l2_get_subdevdata(sd);
@@ -438,7 +607,15 @@ exit:
 	dev_err(&client->dev, "%s: error setting stream\n", __func__);
 	return err;
 }
-
+/*
+ * imx185_g_input_status - This is used to get input status
+ * @sd: Pointer to V4L2 Sub device structure
+ * @status: Pointer to status
+ *
+ * This function is used to get input status
+ *
+ * Return: 0 on success
+ */
 static int imx185_g_input_status(struct v4l2_subdev *sd, u32 *status)
 {
 	struct i2c_client *client = v4l2_get_subdevdata(sd);
@@ -449,7 +626,9 @@ static int imx185_g_input_status(struct v4l2_subdev *sd, u32 *status)
 	*status = pw->state == SWITCH_ON;
 	return 0;
 }
-
+/*
+ * Media operations
+ */
 static struct v4l2_subdev_video_ops imx185_subdev_video_ops = {
 	.s_stream	= imx185_s_stream,
 	.g_mbus_config	= camera_common_g_mbus_config,
@@ -459,14 +638,32 @@ static struct v4l2_subdev_video_ops imx185_subdev_video_ops = {
 static struct v4l2_subdev_core_ops imx185_subdev_core_ops = {
 	.s_power	= camera_common_s_power,
 };
-
+/*
+ * imx185_get_fmt - Get the pad format
+ * @sd: Pointer to V4L2 Sub device structure
+ * @cfg: Pointer to sub device pad information structure
+ * @fmt: Pointer to pad level media bus format
+ *
+ * This function is used to get the pad format information
+ *
+ * Return: 0 on success, errors otherwise
+ */
 static int imx185_get_fmt(struct v4l2_subdev *sd,
 		struct v4l2_subdev_pad_config *cfg,
 		struct v4l2_subdev_format *format)
 {
 	return camera_common_g_fmt(sd, &format->format);
 }
-
+/*
+ * imx185_set_fmt - This is used to set the pad format
+ * @sd: Pointer to V4L2 Sub device structure
+ * @cfg: Pointer to sub device pad information structure
+ * @format: Pointer to pad level media bus format
+ *
+ * This function is used to set the pad format
+ *
+ * Return: 0 on success, errors otherwise
+ */
 static int imx185_set_fmt(struct v4l2_subdev *sd,
 		struct v4l2_subdev_pad_config *cfg,
 	struct v4l2_subdev_format *format)
@@ -480,11 +677,13 @@ static int imx185_set_fmt(struct v4l2_subdev *sd,
 
 	return ret;
 }
-
+/*
+ * Media operations
+ */
 static struct v4l2_subdev_pad_ops imx185_subdev_pad_ops = {
-	.set_fmt = imx185_set_fmt,
-	.get_fmt = imx185_get_fmt,
-	.enum_mbus_code = camera_common_enum_mbus_code,
+	.set_fmt		= imx185_set_fmt,
+	.get_fmt		= imx185_get_fmt,
+	.enum_mbus_code		= camera_common_enum_mbus_code,
 	.enum_frame_size	= camera_common_enum_framesizes,
 	.enum_frame_interval	= camera_common_enum_frameintervals,
 };
@@ -492,7 +691,7 @@ static struct v4l2_subdev_pad_ops imx185_subdev_pad_ops = {
 static struct v4l2_subdev_ops imx185_subdev_ops = {
 	.core	= &imx185_subdev_core_ops,
 	.video	= &imx185_subdev_video_ops,
-	.pad = &imx185_subdev_pad_ops,
+	.pad	= &imx185_subdev_pad_ops,
 };
 
 const struct of_device_id imx185_of_match[] = {
@@ -501,12 +700,20 @@ const struct of_device_id imx185_of_match[] = {
 };
 
 static struct camera_common_sensor_ops imx185_common_ops = {
-	.power_on = imx185_power_on,
+	.power_on  = imx185_power_on,
 	.power_off = imx185_power_off,
 	.write_reg = imx185_write_reg,
-	.read_reg = imx185_read_reg,
+	.read_reg  = imx185_read_reg,
 };
 
+/*
+ * im185_set_group_hold - Function to hold the sensor register
+ * @priv: Pinter to imx185 structure
+ *
+ * This is used to hold the imx185 sensor register
+ *
+ * Return: 0 on success, errors otherwise
+ */
 static int imx185_set_group_hold(struct imx185 *priv, s32 val)
 {
 	int err;
@@ -531,7 +738,15 @@ fail:
 		 "%s: Group hold control error\n", __func__);
 	return err;
 }
-
+/*
+ * imx185_set_gain - Function called when setting analog gain
+ * @priv: Pointer to device structure
+ * @val: Value for gain
+ *
+ * Set the analog gain based on input value.
+ *
+ * Return: 0 on success, errors otherwise
+ */
 static int imx185_set_gain(struct imx185 *priv, s64 val)
 {
 	imx185_reg reg_list[1];
@@ -559,7 +774,15 @@ fail:
 		 "%s: GAIN control error\n", __func__);
 	return err;
 }
-
+/*
+ * imx185_set_frame_rate - Function called when setting frame rate
+ * @priv: Pointer to device structure
+ * @val: Value for rate
+ *
+ * Set the frame rate based on input value.
+ *
+ * Return: 0 on success, errors otherwise
+ */
 static int imx185_set_frame_rate(struct imx185 *priv, s64 val)
 {
 	imx185_reg reg_list[3];
@@ -616,7 +839,15 @@ fail:
 		 "%s: FRAME_LENGTH control error\n", __func__);
 	return err;
 }
-
+/*
+ * imx185_set_exposure - Function called when setting exposure
+ * @priv: Pointer to device structure
+ * @val: Value for exposure
+ *
+ * Set the exposure based on input value.
+ *
+ * Return: 0 on success, errors otherwise
+ */
 static int imx185_set_exposure(struct imx185 *priv, s64 val)
 {
 	int err;
@@ -649,7 +880,15 @@ static int imx185_set_exposure(struct imx185 *priv, s64 val)
 	}
 	return err;
 }
-
+/*
+ * imx185_set_coarse_time - Function called when setting SHR value
+ * @priv: Pointer to imx185 structure
+ * @val: Value for exposure time in number of line_length, or [HMAX]
+ *
+ * Set SHR value based on input value.
+ *
+ * Return: 0 on success, errors otherwise
+ */
 static int imx185_set_coarse_time(struct imx185 *priv, s64 val)
 {
 	struct camera_common_mode_info *mode = priv->pdata->mode_info;
@@ -688,7 +927,15 @@ fail:
 		 "%s: set coarse time error\n", __func__);
 	return err;
 }
-
+/*
+ * imx185_set_coarse_time_hdr - Function called when setting hdr value
+ * @priv: Pointer to imx185 structure
+ * @val: Value for exposure time in number of line_length, or [HMAX]
+ *
+ * Set hdr value based on input value.
+ *
+ * Return: 0 on success, errors otherwise
+ */
 static int imx185_set_coarse_time_hdr(struct imx185 *priv, s64 val)
 {
 	struct camera_common_mode_info *mode = priv->pdata->mode_info;
@@ -751,7 +998,14 @@ fail:
 		 "%s: set WDR coarse time error\n", __func__);
 	return err;
 }
-
+/*
+ * imx185_fuse_id_setup - Function called when setuping fuse id
+ * @priv: Pointer to imx185 structure
+ *
+ * Setup fuse id based on input value.
+ *
+ * Return: 0 on success, errors otherwise
+ */
 static int imx185_fuse_id_setup(struct imx185 *priv)
 {
 	int err;
@@ -799,6 +1053,14 @@ static int imx185_fuse_id_setup(struct imx185 *priv)
 	return 0;
 }
 
+/*
+ * imx185_g_volatile_ctrl - Function called for setting V4L2 control operations
+ * @ctrl: Pointer to V4L2 control structure
+ *
+ * This is used to set V4L2 control operations
+ *
+ * Return: 0 on success, errors otherwise
+ */
 static int imx185_g_volatile_ctrl(struct v4l2_ctrl *ctrl)
 {
 	struct imx185 *priv =
@@ -817,7 +1079,14 @@ static int imx185_g_volatile_ctrl(struct v4l2_ctrl *ctrl)
 
 	return err;
 }
-
+/*
+ * imx185_s_ctrl - Function called for setting V4L2 control operations
+ * @ctrl: Pointer to V4L2 control structure
+ *
+ * This is used to set V4L2 control operations
+ *
+ * Return: 0 on success, errors otherwise
+ */
 static int imx185_s_ctrl(struct v4l2_ctrl *ctrl)
 {
 	struct imx185 *priv =
@@ -853,7 +1122,14 @@ static int imx185_s_ctrl(struct v4l2_ctrl *ctrl)
 
 	return err;
 }
-
+/*
+ * imx185_ctrls_init - Function to initialize V4L2 controls
+ * @priv: Pointer to imx185 structure
+ *
+ * This is used to initialize V4L2 controls for imx185 sensor
+ *
+ * Return: 0 on success, errors otherwise
+ */
 static int imx185_ctrls_init(struct imx185 *priv)
 {
 	struct i2c_client *client = priv->i2c_client;
@@ -901,11 +1177,12 @@ static int imx185_ctrls_init(struct imx185 *priv)
 	}
 
 	err = imx185_fuse_id_setup(priv);
-	if (err) {
-		dev_err(&client->dev,
-			"Error %d reading fuse id data\n", err);
-		goto error;
-	}
+	 // since CTI GPIO are not up during loading of the driver this will fail
+	// if (err) {
+		// dev_err(&client->dev,
+			// "Error %d reading fuse id data\n", err);
+		// goto error;
+	// }
 
 	return 0;
 
@@ -916,6 +1193,14 @@ error:
 
 MODULE_DEVICE_TABLE(of, imx185_of_match);
 
+/*
+ * imx185_parse_dt - Function to parse device tree
+ * @client: Pointer to I2C client structure
+ *
+ * This is used to parse imx185 device tree
+ *
+ * Return: Pointer to camera common pdata on success, NULL on error
+ */
 static struct camera_common_pdata *imx185_parse_dt(struct imx185 *priv,
 				struct i2c_client *client,
 				struct camera_common_data *s_data)
@@ -925,6 +1210,7 @@ static struct camera_common_pdata *imx185_parse_dt(struct imx185 *priv,
 	const struct of_device_id *match;
 	int err;
 	const char *str;
+	int gpio;
 
 	if (!np)
 		return NULL;
@@ -950,9 +1236,21 @@ static struct camera_common_pdata *imx185_parse_dt(struct imx185 *priv,
 	if (err)
 		dev_err(&client->dev, "mclk not in DT\n");
 
-	board_priv_pdata->reset_gpio = of_get_named_gpio(np, "reset-gpios", 0);
-	if (err) {
-		dev_err(&client->dev, "reset-gpios not found %d\n", err);
+	gpio = of_get_named_gpio(np, "reset-gpios", 0);
+	if(gpio > 0) {
+		board_priv_pdata->reset_gpio = gpio;
+		err = gpio_request(board_priv_pdata->reset_gpio, "imx185_reset_gpio");
+		if (err)
+			dev_err(&client->dev,"gpio_request failed for gpio %d\n",board_priv_pdata->reset_gpio);
+		else {
+			err = gpio_direction_output(board_priv_pdata->reset_gpio, 1);
+			if (err) {
+				dev_err(&client->dev,"gpio_direction_output failed for gpio %d\n",board_priv_pdata->reset_gpio);
+				board_priv_pdata->reset_gpio = 0;
+			}
+		}
+	}
+	else {
 		board_priv_pdata->reset_gpio = 0;
 	}
 
@@ -962,7 +1260,14 @@ static struct camera_common_pdata *imx185_parse_dt(struct imx185 *priv,
 
 	return board_priv_pdata;
 }
-
+/*
+ * imx185_open - Function to open camera device
+ * @fh: Pointer to V4L2 subdevice structure
+ *
+ * This function does nothing
+ *
+ * Return: 0 on success
+ */
 static int imx185_open(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 {
 	struct i2c_client *client = v4l2_get_subdevdata(sd);
@@ -971,7 +1276,9 @@ static int imx185_open(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
 
 	return 0;
 }
-
+/*
+ * Media operations
+ */
 static const struct v4l2_subdev_internal_ops imx185_subdev_internal_ops = {
 	.open = imx185_open,
 };
@@ -979,7 +1286,15 @@ static const struct v4l2_subdev_internal_ops imx185_subdev_internal_ops = {
 static const struct media_entity_operations imx185_media_ops = {
 	.link_validate = v4l2_subdev_link_validate,
 };
-
+/*
+ * imx185 probe - Function called for I2C driver
+ * @client: Pointer to I2C client structure
+ * @id: Pointer to I2C device id structure
+ *
+ * This is used to probe imx185 sensor
+ *
+ * Return: 0 on success, errors otherwise
+ */
 static int imx185_probe(struct i2c_client *client,
 			const struct i2c_device_id *id)
 {
@@ -1020,30 +1335,30 @@ static int imx185_probe(struct i2c_client *client,
 		return -EFAULT;
 	}
 
-	common_data->ops = &imx185_common_ops;
-	common_data->ctrl_handler = &priv->ctrl_handler;
-	common_data->i2c_client = client;
-	common_data->frmfmt = &imx185_frmfmt[0];
-	common_data->colorfmt = camera_common_find_datafmt(
+	common_data->ops		= &imx185_common_ops;
+	common_data->ctrl_handler	= &priv->ctrl_handler;
+	common_data->i2c_client		= client;
+	common_data->frmfmt		= &imx185_frmfmt[0];
+	common_data->colorfmt		= camera_common_find_datafmt(
 					  IMX185_DEFAULT_DATAFMT);
-	common_data->power = &priv->power;
-	common_data->ctrls = priv->ctrls;
-	common_data->priv = (void *)priv;
-	common_data->numctrls = ARRAY_SIZE(ctrl_config_list);
-	common_data->numfmts = ARRAY_SIZE(imx185_frmfmt);
-	common_data->def_mode = IMX185_DEFAULT_MODE;
-	common_data->def_width = IMX185_DEFAULT_WIDTH;
-	common_data->def_height = IMX185_DEFAULT_HEIGHT;
-	common_data->fmt_width = common_data->def_width;
-	common_data->fmt_height = common_data->def_height;
-	common_data->def_clk_freq = IMX185_DEFAULT_CLK_FREQ;
+	common_data->power		= &priv->power;
+	common_data->ctrls		= priv->ctrls;
+	common_data->priv		= (void *)priv;
+	common_data->numctrls		= ARRAY_SIZE(ctrl_config_list);
+	common_data->numfmts		= ARRAY_SIZE(imx185_frmfmt);
+	common_data->def_mode		= IMX185_DEFAULT_MODE;
+	common_data->def_width		= IMX185_DEFAULT_WIDTH;
+	common_data->def_height		= IMX185_DEFAULT_HEIGHT;
+	common_data->fmt_width		= common_data->def_width;
+	common_data->fmt_height		= common_data->def_height;
+	common_data->def_clk_freq	= IMX185_DEFAULT_CLK_FREQ;
 
-	priv->i2c_client = client;
-	priv->s_data = common_data;
-	priv->subdev = &common_data->subdev;
-	priv->subdev->dev = &client->dev;
-	priv->s_data->dev = &client->dev;
-	priv->last_wdr_et_val = 0;
+	priv->i2c_client		= client;
+	priv->s_data			= common_data;
+	priv->subdev			= &common_data->subdev;
+	priv->subdev->dev		= &client->dev;
+	priv->s_data->dev		= &client->dev;
+	priv->last_wdr_et_val		= 0;
 
 	err = imx185_power_get(priv);
 	if (err)
@@ -1067,7 +1382,7 @@ static int imx185_probe(struct i2c_client *client,
 
 	priv->subdev->internal_ops = &imx185_subdev_internal_ops;
 	priv->subdev->flags |= V4L2_SUBDEV_FL_HAS_DEVNODE |
-		     V4L2_SUBDEV_FL_HAS_EVENTS;
+				V4L2_SUBDEV_FL_HAS_EVENTS;
 
 #if defined(CONFIG_MEDIA_CONTROLLER)
 	priv->pad.flags = MEDIA_PAD_FL_SOURCE;
@@ -1089,8 +1404,15 @@ static int imx185_probe(struct i2c_client *client,
 	return 0;
 }
 
-static int
-imx185_remove(struct i2c_client *client)
+/*
+ * imx185_remove - Function called for I2C driver
+ * @client: Pointer to I2C client structure
+ *
+ * This is used to remove imx185 sensor
+ *
+ * return: 0 one success
+ */
+static int imx185_remove(struct i2c_client *client)
 {
 	struct camera_common_data *s_data = to_camera_common_data(client);
 	struct imx185 *priv = (struct imx185 *)s_data->priv;
@@ -1105,6 +1427,9 @@ imx185_remove(struct i2c_client *client)
 	return 0;
 }
 
+/*
+ * Media related structure
+ */
 static const struct i2c_device_id imx185_id[] = {
 	{ "imx185", 0 },
 	{ }
