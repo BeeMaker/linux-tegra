@@ -30,6 +30,7 @@ obj-$(CONFIG_CAN_RCAR)		+= rcar_can.o
 obj-$(CONFIG_CAN_SUN4I)		+= sun4i_can.o
 obj-$(CONFIG_CAN_XILINXCAN)	+= xilinx_can.o
 obj-$(CONFIG_TEGRA_HV_SECCAN) += nvhvseccan.o
+obj-$(CONFIG_CAN_MCP251X) += spi/
 
 subdir-ccflags-y += -D__CHECK_ENDIAN__
 subdir-ccflags-$(CONFIG_CAN_DEBUG_DEVICES) += -DDEBUG

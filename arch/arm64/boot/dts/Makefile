@@ -26,7 +26,11 @@ targets += dtbs
 
 DTC_FLAGS += -i $(srctree)/include
 DTCCPP_FLAGS += -I$(srctree)/include
+DTC_FLAGS := -i $(tegra-dtstree)/soc/tegra/kernel-include
+DTC_FLAGS += -i $(tegra-dtstree)/soc/tegra/kernel-include/kernel-4.4
 DTC_FLAGS += -i $(tegra-dtstree)/platform/tegra/common/kernel-dts
+DTCCPP_FLAGS := -I$(tegra-dtstree)/soc/tegra/kernel-include
+DTCCPP_FLAGS += -I$(tegra-dtstree)/soc/tegra/kernel-include/kernel-4.4
 DTCCPP_FLAGS += -I$(tegra-dtstree)/platform/tegra/common/kernel-dts
 
 ifeq ($(CONFIG_ARCH_TEGRA_210_SOC),y)
