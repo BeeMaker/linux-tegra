@@ -25,13 +25,9 @@ always		:= $(dtb-y)
 targets += dtbs
 
 DTC_FLAGS += -i $(srctree)/include
-DTC_FLAGS += -i $(tegra-dtstree)/soc/tegra/kernel-include
-DTC_FLAGS += -i $(tegra-dtstree)/soc/tegra/kernel-include/kernel-4.4
 DTC_FLAGS += -i $(tegra-dtstree)/platform/tegra/common/kernel-dts
 
 DTCCPP_FLAGS += -I$(srctree)/include
-DTCCPP_FLAGS += -I$(tegra-dtstree)/soc/tegra/kernel-include
-DTCCPP_FLAGS += -I$(tegra-dtstree)/soc/tegra/kernel-include/kernel-4.4
 DTCCPP_FLAGS += -I$(tegra-dtstree)/platform/tegra/common/kernel-dts
 
 ifeq ($(CONFIG_ARCH_TEGRA_210_SOC),y)
@@ -49,9 +45,6 @@ DTCCPP_FLAGS += -I$(tegra-dtstree)/soc/t18x/kernel-include
 DTCCPP_FLAGS += -I$(tegra-dtstree)/soc/t18x/kernel-dts
 DTCCPP_FLAGS += -I$(tegra-dtstree)/platform/t18x/common/kernel-dts
 
-#CTI kernel-dts patch
-DTC_FLAGS += -I$(srctree)/nvidia/platform/t18x/quill/kernel-dts
-DTCCPP_FLAGS += -I$(srctree)/nvidia/platform/t18x/quill/kernel-dts
 endif
 
 ifeq ($(CONFIG_ARCH_TEGRA_19x_SOC),y)
