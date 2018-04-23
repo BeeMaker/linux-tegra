@@ -141,6 +141,24 @@ struct pca953x_chip {
 	int (*read_regs)(struct pca953x_chip *, int, u8 *);
 };
 
+#define DRIVER_DEFERRED_LOAD_TIME_MS	15000 // 15 secnonds
+
+typedef struct {
+	struct pca953x_chip *chip;
+	struct i2c_client *client;
+	const struct i2c_device_id *id;
+}_task_context;
+
+_task_context task_context1, task_context2;
+
+void finish_probe(struct pca953x_chip *chip,
+									struct i2c_client *client,
+									const struct i2c_device_id *id
+									) ;
+static struct delayed_work detect_delay;
+static void gpio_init_delayed(struct work_struct *);
+int first_work_queue=1;
+
 static int pca953x_read_single(struct pca953x_chip *chip, int reg, u32 *val,
 				int off)
 {
@@ -739,9 +757,8 @@ static int pca953x_probe(struct i2c_client *client,
 	struct pca953x_platform_data *pdata;
 	struct pca953x_chip *chip;
 	int irq_base = 0;
-	int ret;
 	u32 invert = 0;
-	struct regulator *reg;
+	struct regulator *reg=NULL;
 
 	chip = devm_kzalloc(&client->dev,
 			sizeof(struct pca953x_chip), GFP_KERNEL);
@@ -760,7 +777,7 @@ static int pca953x_probe(struct i2c_client *client,
 	}
 
 	chip->client = client;
-
+	/* Spacely does not have regulator 
 	reg = devm_regulator_get(&client->dev, "vcc");
 	if (IS_ERR(reg)) {
 		ret = PTR_ERR(reg);
@@ -772,7 +789,7 @@ static int pca953x_probe(struct i2c_client *client,
 	if (ret) {
 		dev_err(&client->dev, "reg en err: %d\n", ret);
 		return ret;
-	}
+	}*/
 	chip->regulator = reg;
 
 	if (i2c_id) {
@@ -787,8 +804,7 @@ static int pca953x_probe(struct i2c_client *client,
 		} else {
 			acpi_id = acpi_match_device(pca953x_acpi_ids, &client->dev);
 			if (!acpi_id) {
-				ret = -ENODEV;
-				goto err_exit;
+				return -ENODEV;
 			}
 
 			chip->driver_data = acpi_id->driver_data;
@@ -834,6 +850,47 @@ static int pca953x_probe(struct i2c_client *client,
 		chip->read_regs = pca953x_read_regs_16;
 	}
 
+	// we need to defer the probe, otherwise chip won't respond
+	if(first_work_queue) {
+		first_work_queue = 0;
+		task_context1.chip = chip;
+		task_context1.client = client;
+		task_context1.id = i2c_id;
+		task_context2.chip = 0;
+		INIT_DELAYED_WORK(&detect_delay, gpio_init_delayed);			
+		schedule_delayed_work(&detect_delay, msecs_to_jiffies(DRIVER_DEFERRED_LOAD_TIME_MS));
+	}
+	else {
+		task_context2.chip = chip;
+		task_context2.client = client;
+		task_context2.id = i2c_id;
+	}
+	
+	return 0;
+}
+
+void finish_probe(struct pca953x_chip *chip,
+									struct i2c_client *client,
+									const struct i2c_device_id *id
+									) 
+{
+	struct pca953x_platform_data *pdata;
+	int irq_base = 0;
+	int ret;
+	u32 invert = 0;
+	
+	pdata = client->dev.platform_data;
+	pdata = dev_get_platdata(&client->dev);
+	if (pdata) {
+		irq_base = pdata->irq_base;
+		chip->gpio_start = pdata->gpio_base;
+		invert = pdata->invert;
+		chip->names = pdata->names;
+	} else {
+		chip->gpio_start = -1;
+		irq_base = 0;
+	}
+	
 	if (PCA_CHIP_TYPE(chip->driver_data) == PCA953X_TYPE)
 		ret = device_pca953x_init(chip, invert);
 	else
@@ -857,15 +914,27 @@ static int pca953x_probe(struct i2c_client *client,
 	}
 
 	i2c_set_clientdata(client, chip);
-	return 0;
-
-err_exit:
-	regulator_disable(chip->regulator);
-	devm_kfree(&client->dev, chip);
-
-	return ret;
+	err_exit:
+	return;
 }
 
+void gpio_init_delayed(struct work_struct *context)
+{
+	struct pca953x_chip *chip;
+	struct i2c_client *client;
+	const struct i2c_device_id *id;		
+	
+	chip = task_context1.chip;
+	client = task_context1.client;
+	id = task_context1.id;	
+	finish_probe(chip, client, id);
+	if(task_context2.chip) {
+		chip = task_context2.chip;
+		client = task_context2.client;
+		id = task_context2.id;	
+		finish_probe(chip, client, id);
+	}
+}
 static int pca953x_remove(struct i2c_client *client)
 {
 	struct pca953x_platform_data *pdata = dev_get_platdata(&client->dev);
@@ -1003,7 +1072,8 @@ static int __init pca953x_init(void)
 /* register after i2c postcore initcall and before
  * subsys initcalls that may rely on these GPIOs
  */
-subsys_initcall(pca953x_init);
+//subsys_initcall(pca953x_init);
+module_init(pca953x_init);
 
 static void __exit pca953x_exit(void)
 {

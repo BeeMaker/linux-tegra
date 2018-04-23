@@ -85,7 +85,7 @@ EXPORT_TRACEPOINT_SYMBOL(display_readl);
 
 
 /* HACK! This needs to come from DT */
-#include "../../../../arch/arm/mach-tegra/iomap.h"
+#include "../../../../../../arch/arm/mach-tegra/iomap.h"
 
 #define TEGRA_CRC_LATCHED_DELAY		34
 
@@ -6596,7 +6596,7 @@ static int __init parse_disp_params(char *options, struct tegra_dc_mode *mode)
 	int i, params[11];
 	char *p;
 
-	memset(params, 0, sizeof(params));
+	memset(params, 0, ARRAY_SIZE(params));
 	for (i = 0; i < ARRAY_SIZE(params); i++) {
 		if ((p = strsep(&options, ",")) != NULL) {
 			if (*p)

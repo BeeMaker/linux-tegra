@@ -679,7 +679,7 @@ static int its_chunk_to_lpi(int chunk)
 	return (chunk << IRQS_PER_CHUNK_SHIFT) + 8192;
 }
 
-static int __init its_lpi_init(u32 id_bits)
+static int its_lpi_init(u32 id_bits)
 {
 	lpi_chunks = its_lpi_to_chunk(1UL << id_bits);
 
@@ -1464,8 +1464,7 @@ static void its_enable_quirks(struct its_node *its)
 	gic_enable_quirks(iidr, its_quirks, its);
 }
 
-static int __init its_probe(struct device_node *node,
-			    struct irq_domain *parent)
+static int its_probe(struct device_node *node, struct irq_domain *parent)
 {
 	struct resource res;
 	struct its_node *its;
@@ -1627,7 +1626,7 @@ static struct of_device_id its_device_id[] = {
 	{},
 };
 
-int __init its_init(struct device_node *node, struct rdists *rdists,
+int its_init(struct device_node *node, struct rdists *rdists,
 	     struct irq_domain *parent_domain)
 {
 	struct device_node *np;

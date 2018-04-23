@@ -1,0 +1,89 @@
+/*
+ * arch/arm64/boot/dts/tegra210-tx1-cti-ASG008-IMX185.dts
+ *
+ * Copyright (c) 2016, NVIDIA CORPORATION.  All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; version 2 of the License.
+ *
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ * more details.
+ *
+ */
+
+#include "tegra210-tx1-cti-base.dts"
+#include "jetson-platforms/tegra210-tx1-cti-camera-ASG008-IMX185.dtsi"
+
+/ {
+	model = "jetson_tx1";
+	compatible = "nvidia,jetson-cv", "nvidia,tegra210";
+	nvidia,dtsfilename = "tegra210-tx1-cti-ASG008-IMX185.dts";
+
+	#address-cells = <2>;
+	#size-cells = <2>;
+
+	chosen {
+		bootloader {
+			nvidia,skip-display-init;
+		};
+	};
+
+	host1x {
+		dc@54200000 {
+			status = "disabled";
+		};
+
+		dsi {
+			status = "disabled";
+			panel-a-wuxga-8-0 {
+				status = "disabled";
+			};
+			panel-s-wqxga-10-1 {
+				status = "disabled";
+			};
+		};
+
+		sor {
+			panel-s-edp-uhdtv-15-6 {
+				status = "disabled";
+			};
+			prod-settings {
+				status = "disabled";
+			};
+		};
+	};
+
+	i2c@7000c400 {
+		lp8557-backlight-a-wuxga-8-0@2c {
+			status = "disabled";
+		};
+	};
+
+	backlight {
+		status = "disabled";
+		panel-a-wuxga-8-0-bl {
+			status = "disabled";
+		};
+		panel-s-edp-uhdtv-15-6-bl {
+			status = "disabled";
+		};
+	};
+
+	sor {
+		status = "disabled";
+		prod-settings {
+			status = "disabled";
+		};
+		panel-s-edp-uhdtv-15-6 {
+			smartdimmer {
+				status = "disabled";
+			};
+		};
+	};
+};
+
+#include <t210-common-overrides/tegra210-power-dvfs-override-ucm2c.dtsi>
+

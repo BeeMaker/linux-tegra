@@ -35,7 +35,7 @@ config TEGRA_DC
 	  Enable this to access the Tegra display controller using either framebuffer
 	  console interface and a proprietary dc-ext interface or with ADF.
 
-trysource ../display/drivers/video/tegra/Kconfig
+trysource "nvidia/display/drivers/video/tegra/Kconfig"
 trysource "nvidia/display/drivers/video/tegra/Kconfig.display"
 trysource "drivers/video/tegra/Kconfig.display"
 

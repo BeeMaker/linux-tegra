@@ -1,0 +1,58 @@
+./drivers/dma/Kconfig:trysource "nvidia/t18x/drivers/dma/Kconfig"
+./drivers/dma/Kconfig:trysource "nvidia/t18x/drivers/dma/Kconfig.t18x"
+./drivers/pinctrl/Kconfig:trysource "nvidia/t18x/drivers/pinctrl/Kconfig"
+./drivers/pinctrl/Kconfig:trysource "nvidia/t18x/drivers/pinctrl/Kconfig.t18x"
+./drivers/i2c/busses/Kconfig:trysource "nvidia/t18x/drivers/i2c/busses/Kconfig"
+./drivers/i2c/busses/Kconfig:trysource "nvidia/t18x/drivers/i2c/busses/Kconfig.t18x"
+./drivers/Kconfig:trysource "nvidia/nvgpu/drivers/gpu/nvgpu/Kconfig"
+./drivers/Kconfig:trysource "nvidia/nvgpu/drivers/gpu/nvgpu/Kconfig.nvgpu"
+./drivers/Kconfig:trysource "nvidia/nvhost-t18x/drivers/video/tegra/host/Kconfig"
+./drivers/Kconfig:trysource "nvidia/nvhost-t18x/drivers/video/tegra/host/Kconfig.nvhost-t18x"
+./drivers/Kconfig:trysource "nvidia/t18x/drivers/tachometer/Kconfig"
+./drivers/Kconfig:trysource "nvidia/t18x/drivers/tachometer/Kconfig.t18x"
+./drivers/Kconfig:trysource "nvidia/t18x/drivers/misc/csi_mipi_cal/Kconfig"
+./drivers/Kconfig:trysource "nvidia/t18x/drivers/misc/csi_mipi_cal/Kconfig.t18x"
+./drivers/Kconfig:trysource "nvidia/t18x/drivers/misc/tegra186-ahc/Kconfig"
+./drivers/Kconfig:trysource "nvidia/t18x/drivers/misc/tegra186-ahc/Kconfig.t18x"
+./drivers/Kconfig:trysource "nvidia/nvhost-t19x/drivers/video/tegra/host/Kconfig"
+./drivers/Kconfig:trysource "nvidia/nvhost-t19x/drivers/video/tegra/host/Kconfig.nvhost-t19x"
+./drivers/watchdog/Kconfig:trysource "nvidia/t18x/drivers/watchdog/Kconfig"
+./drivers/watchdog/Kconfig:trysource "nvidia/t18x/drivers/watchdog/Kconfig.t18x"
+./drivers/video/fbdev/Kconfig:	 nvidiafb, i810fb or savagefb.
+./drivers/video/fbdev/Kconfig:	  module will be called nvidiafb.
+./drivers/video/tegra/Kconfig:trysource "nvidia/nvhost/drivers/video/tegra/Kconfig"
+./drivers/video/tegra/Kconfig:trysource "nvidia/nvhost/drivers/video/tegra/Kconfig.nvhost"
+./drivers/video/tegra/Kconfig:trysource "nvidia/nvmap/drivers/video/tegra/nvmap/Kconfig"
+./drivers/video/tegra/Kconfig:trysource "nvidia/nvmap/drivers/video/tegra/nvmap/Kconfig.nvmap"
+./drivers/video/tegra/Kconfig:trysource "nvidia/display/drivers/video/tegra/Kconfig.display"
+./drivers/spi/Kconfig:trysource "nvidia/t18x/drivers/spi/Kconfig"
+./drivers/spi/Kconfig:trysource "nvidia/t18x/drivers/spi/Kconfig.t18x"
+./drivers/tty/serial/Kconfig:trysource "nvidia/t18x/drivers/tty/serial/Kconfig"
+./drivers/tty/serial/Kconfig:trysource "nvidia/t18x/drivers/tty/serial/Kconfig.t18x"
+./drivers/gpio/Kconfig:trysource "nvidia/t18x/drivers/gpio/Kconfig"
+./drivers/gpio/Kconfig:trysource "nvidia/t18x/drivers/gpio/Kconfig.t18x"
+./drivers/clocksource/Kconfig:trysource "nvidia/t18x/drivers/clocksource/Kconfig"
+./drivers/clocksource/Kconfig:trysource "nvidia/t18x/drivers/clocksource/Kconfig.t18x"
+./drivers/platform/x86/Kconfig:	  is required for switchable nvidia graphics machines
+./drivers/platform/tegra/Kconfig:trysource "nvidia/t18x/drivers/platform/tegra/Kconfig"
+./drivers/platform/tegra/Kconfig:trysource "nvidia/t18x/drivers/platform/tegra/Kconfig.t18x"
+./drivers/crypto/Kconfig:trysource "nvidia/t18x/drivers/crypto/Kconfig"
+./drivers/crypto/Kconfig:trysource "nvidia/t18x/drivers/crypto/Kconfig.t18x"
+./drivers/crypto/Kconfig:trysource "nvidia/t18x/drivers/crypto/elliptic/Kconfig"
+./drivers/crypto/Kconfig:trysource "nvidia/t18x/drivers/crypto/elliptic/Kconfig.t18x"
+./drivers/mtd/maps/Kconfig:	  Support for treating the BIOS flash chip on nvidia motherboards
+./drivers/net/can/Kconfig:trysource "nvidia/t18x/drivers/net/can/Kconfig.t18x"
+./drivers/net/ethernet/Kconfig:source "drivers/net/ethernet/nvidia/Kconfig"
+./drivers/net/ethernet/Kconfig:trysource "drivers/net/ethernet/nvidia/eqos/Kconfig"
+./drivers/net/ethernet/dec/tulip/Kconfig:	  (<http://www.nvidia.com/page/uli_drivers.html>).
+./kernel-4.4/drivers/video/fbdev/Kconfig:	 nvidiafb, i810fb or savagefb.
+./kernel-4.4/drivers/video/fbdev/Kconfig:	  module will be called nvidiafb.
+./kernel-4.4/drivers/platform/x86/Kconfig:	  is required for switchable nvidia graphics machines
+./kernel-4.4/drivers/mtd/maps/Kconfig:	  Support for treating the BIOS flash chip on nvidia motherboards
+./kernel-4.4/drivers/net/ethernet/Kconfig:source "drivers/net/ethernet/nvidia/Kconfig"
+./kernel-4.4/drivers/net/ethernet/Kconfig:trysource "drivers/net/ethernet/nvidia/eqos/Kconfig"
+./kernel-4.4/drivers/net/ethernet/dec/tulip/Kconfig:	  (<http://www.nvidia.com/page/uli_drivers.html>).
+./sound/soc/Kconfig:trysource "nvidia/t18x/sound/soc/Kconfig"
+./sound/soc/Kconfig:trysource "nvidia/t18x/sound/soc/Kconfig.t18x"
+./arch/arm64/Kconfig:trysource nvidia/t18x/arch/arm64/Kconfig
+./arch/arm64/Kconfig:trysource nvidia/t18x/arch/arm64/Kconfig.t18x

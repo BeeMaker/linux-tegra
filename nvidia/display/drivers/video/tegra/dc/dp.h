@@ -26,7 +26,7 @@
 #include "dc_priv.h"
 #include "dpaux_regs.h"
 #include "hpd.h"
-#include "../../../../arch/arm/mach-tegra/iomap.h"
+#include "../../../../../../arch/arm/mach-tegra/iomap.h"
 #include "dp_lt.h"
 
 #ifdef CONFIG_DEBUG_FS

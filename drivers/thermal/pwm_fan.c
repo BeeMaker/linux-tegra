@@ -371,7 +371,7 @@ static int pwm_fan_set_cur_state(struct thermal_cooling_device *cdev,
 	else
 		target_pwm = fan_data->fan_pwm[cur_state];
 
-	target_pwm = min(fan_data->fan_cap_pwm, target_pwm);
+	target_pwm = max(fan_data->fan_cap_pwm, target_pwm);
 	fan_update_target_pwm(fan_data, target_pwm);
 
 	mutex_unlock(&fan_data->fan_state_lock);
@@ -1056,6 +1056,14 @@ static int pwm_fan_probe(struct platform_device *pdev)
 
 	spin_lock_init(&fan_data->irq_lock);
 	atomic_set(&fan_data->tach_enabled, 0);
+
+	fan_data->fan_cur_pwm = 255;
+	fan_data->next_target_pwm = 255;
+	set_pwm_duty_cycle(0, fan_data);
+	fan_data->fan_temp_control_flag = 1;
+	queue_delayed_work(fan_data->workqueue, &fan_data->fan_ramp_work,
+			   msecs_to_jiffies(fan_data->step_time));
+
 	if (fan_data->tach_gpio != -1) {
 		/* init fan tach */
 		fan_data->tach_irq = gpio_to_irq(fan_data->tach_gpio);

@@ -24,9 +24,16 @@ always		:= $(dtb-y)
 
 targets += dtbs
 
+#DTC_FLAGS ?= ""
+
 DTC_FLAGS += -i $(srctree)/include
 DTCCPP_FLAGS += -I$(srctree)/include
+
+#DTC_FLAGS += -i $(tegra-dtstree)/soc/tegra/kernel-include
+#DTC_FLAGS += -i $(tegra-dtstree)/soc/tegra/kernel-include/kernel-4.4
 DTC_FLAGS += -i $(tegra-dtstree)/platform/tegra/common/kernel-dts
+#DTCCPP_FLAGS += -I$(tegra-dtstree)/soc/tegra/kernel-include
+#DTCCPP_FLAGS += -I$(tegra-dtstree)/soc/tegra/kernel-include/kernel-4.4
 DTCCPP_FLAGS += -I$(tegra-dtstree)/platform/tegra/common/kernel-dts
 
 ifeq ($(CONFIG_ARCH_TEGRA_210_SOC),y)
@@ -90,6 +97,7 @@ DTB_NEW_RULE_LIST := $(call replace_ddot,$(DTB_NEW_RULE_LIST))
 
 $(DTB_NEW_RULE_LIST):
 	$(call if_changed_dep,dtc)
+#	$(call cmd,dtc)
 
 dtbs: $(DTB_OBJS) FORCE
 	cp -u $(DTB_OBJS) arch/arm64/boot/dts/

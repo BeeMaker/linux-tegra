@@ -1,0 +1,10 @@
+/*
+ * Set the I2C bus 1 baudrate to 1Mbit/s
+ */
+
+
+/ {
+    i2c@7000c400 {
+        clock-frequency = <400000>; /* Was 400000 */
+    };
+};

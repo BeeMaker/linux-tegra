@@ -27,7 +27,7 @@
 #include "dsi.h"
 #include <asm/uaccess.h>
 /* HACK! This needs to come from DT */
-#include "../../../../arch/arm/mach-tegra/iomap.h"
+#include "../../../../../../arch/arm/mach-tegra/iomap.h"
 
 #ifdef CONFIG_DEBUG_FS
 
