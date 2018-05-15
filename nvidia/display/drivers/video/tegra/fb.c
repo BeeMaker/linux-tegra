@@ -6,7 +6,7 @@
  *         Colin Cross <ccross@android.com>
  *         Travis Geiselbrecht <travis@palm.com>
  *
- * Copyright (c) 2010-2017, NVIDIA CORPORATION, All rights reserved.
+ * Copyright (c) 2010-2018, NVIDIA CORPORATION, All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -372,7 +372,7 @@ static int tegra_fb_blank(int blank, struct fb_info *info)
 		dev_info(&tegra_fb->ndev->dev, "unblank\n");
 		tegra_dc_enable(dc);
 
-		if (!dc->suspended && dc->blanked) {
+		if ((!atomic_read(&dc->suspended)) && dc->blanked) {
 			/*
 			 * Do not restore old EXT windows if mode has been
 			 * updated. EXT window parameters will be updated as
@@ -408,7 +408,7 @@ static int tegra_fb_blank(int blank, struct fb_info *info)
 	case FB_BLANK_POWERDOWN:
 		dev_info(&tegra_fb->ndev->dev, "blank - powerdown\n");
 		/* To pan fb while switching from X */
-		if (!dc->suspended && dc->enabled)
+		if ((!atomic_read(&dc->suspended)) && dc->enabled)
 			tegra_fb->curr_xoffset = -1;
 
 		if (dc->enabled)
@@ -461,7 +461,7 @@ static int tegra_fb_pan_display(struct fb_var_screeninfo *var,
 		tegra_fb->win.flags |= TEGRA_WIN_FLAG_FB;
 		tegra_fb->win.virt_addr = info->screen_base;
 
-		if (!tegra_fb->win.dc->suspended) {
+		if (!atomic_read(&tegra_fb->win.dc->suspended)) {
 			struct tegra_dc_win *win = &tegra_fb->win;
 			tegra_dc_update_windows(&win, 1, NULL, true);
 			tegra_dc_sync_windows(&win, 1);
@@ -494,11 +494,32 @@ static int tegra_get_modedb(struct tegra_dc *dc, struct tegra_fb_modedb *modedb,
 	struct fb_info *info)
 {
 	unsigned i;
-	struct fb_var_screeninfo __user *modedb_ptr;
-	struct fb_modelist *modelist;
+	struct fb_var_screeninfo __user *modedb_ptr = NULL;
+	struct fb_modelist *modelist = NULL;
 
 	i = 0;
+
+	if (list_empty(&info->modelist)) {
+		/* if modelist empty, return modelength as 0 */
+		modedb->modedb_len = 0;
+		return 0;
+	}
+
 	modedb_ptr = user_ptr(modedb->modedb);
+
+	if (modedb->modedb_len == 0) {
+		list_for_each_entry(modelist, &info->modelist, list) {
+			i++;
+
+			if (modelist->mode.vmode & FB_VMODE_STEREO_MASK)
+				i++;
+		}
+		modedb->modedb_len = i;
+		return 0;
+	}
+
+	i = 0;
+
 	list_for_each_entry(modelist, &info->modelist, list) {
 		struct fb_var_screeninfo var;
 
@@ -530,15 +551,7 @@ static int tegra_get_modedb(struct tegra_dc *dc, struct tegra_fb_modedb *modedb,
 			i++;
 		}
 	}
-
-	/*
-	 * If modedb_len == 0, return how many modes are
-	 * available; otherwise, return how many modes were written.
-	 */
-	if (modedb->modedb_len == 0)
-		modedb->modedb_len = i;
-	else
-		modedb->modedb_len = min(modedb->modedb_len, i);
+	modedb->modedb_len = min(modedb->modedb_len, i);
 
 	return 0;
 }
@@ -741,6 +754,7 @@ void tegra_fbcon_set_fb_mode(struct tegra_fb_info *fb_info,
 	console_lock();
 	/* Disable DC */
 	blank = FB_BLANK_POWERDOWN;
+
 	fb_notifier_call_chain(FB_EVENT_BLANK, &event);
 	/*
 	 * fbconsole can only invoke blank events 0 (FB_BLANK_UNBLANK) or
@@ -874,10 +888,12 @@ void tegra_fb_update_monspecs(struct tegra_fb_info *fb_info,
 	/* Restoring to state running. */
 	fb_info->info->state =  FBINFO_STATE_RUNNING;
 
-	if (IS_ENABLED(CONFIG_FRAMEBUFFER_CONSOLE))
-		tegra_fbcon_set_fb_mode(fb_info, &fb_mode);
-	else
+	if (IS_ENABLED(CONFIG_FRAMEBUFFER_CONSOLE)) {
+		if (!atomic_read(&dc->suspended))
+			tegra_fbcon_set_fb_mode(fb_info, &fb_mode);
+	} else {
 		fb_notifier_call_chain(FB_EVENT_NEW_MODELIST, &event);
+	}
 
 	mutex_unlock(&fb_info->info->lock);
 }
@@ -900,7 +916,6 @@ void tegra_fb_update_fix(struct tegra_fb_info *fb_info,
 	if (tegra_edid_support_yuv444(dc_edid))
 		fix->capabilities |= FB_CAP_Y444;
 	fix->capabilities |= tegra_edid_get_ex_hdr_cap(dc_edid);
-	fix->capabilities |= tegra_edid_get_quant_cap(dc_edid);
 
 	fix->max_clk_rate = tegra_edid_get_max_clk_rate(dc_edid);
 

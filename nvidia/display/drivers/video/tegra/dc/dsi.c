@@ -4578,18 +4578,11 @@ static int _tegra_dc_dsi_init(struct tegra_dc *dc)
 	 */
 	if (!dsi->info.ganged_type && !dsi->info.dsi_csi_loopback &&
 		(dsi->info.controller_vs >= DSI_VS_1)) {
-		if ((dsi->info.dpd_dsi_pads & DSI_DPD_EN) &&
-			dsi->dsi_io_padctrl[0])
-			padctrl_power_disable(dsi->dsi_io_padctrl[0]);
-		if ((dsi->info.dpd_dsi_pads & DSIB_DPD_EN) &&
-			dsi->dsi_io_padctrl[1])
-			padctrl_power_disable(dsi->dsi_io_padctrl[1]);
-		if ((dsi->info.dpd_dsi_pads & DSIC_DPD_EN) &&
-			dsi->dsi_io_padctrl[2])
-			padctrl_power_disable(dsi->dsi_io_padctrl[2]);
-		if ((dsi->info.dpd_dsi_pads & DSID_DPD_EN) &&
-			dsi->dsi_io_padctrl[3])
-			padctrl_power_disable(dsi->dsi_io_padctrl[3]);
+		for (i = 0; i < dsi->max_instances; i++) {
+			if ((dsi->info.dpd_dsi_pads & DSI_DPD_EN) &&
+				dsi->dsi_io_padctrl[i])
+				padctrl_power_disable(dsi->dsi_io_padctrl[i]);
+		}
 	}
 
 	/*

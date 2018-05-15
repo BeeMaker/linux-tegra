@@ -606,20 +606,40 @@ int tegra_edid_get_ex_hdr_cap_info(struct tegra_edid *edid,
 
 	return ret;
 }
-u16 tegra_edid_get_quant_cap(struct tegra_edid *edid)
+
+u16 tegra_edid_get_rgb_quant_cap(struct tegra_edid *edid)
+{
+	if (!edid || !edid->data) {
+		pr_warn("edid invalid\n");
+		return 0;
+	}
+	return edid->data->rgb_quant_selectable;
+}
+
+u16 tegra_edid_get_yuv_quant_cap(struct tegra_edid *edid)
+{
+	if (!edid || !edid->data) {
+		pr_warn("edid invalid\n");
+		return 0;
+	}
+	return edid->data->yuv_quant_selectable;
+}
+
+int tegra_edid_get_ex_quant_cap_info(struct tegra_edid *edid,
+			struct tegra_dc_ext_quant_caps *quant_cap_info)
 {
 	u16 ret = 0;
 
 	if (!edid || !edid->data) {
 		pr_warn("edid invalid\n");
-		return 0;
+		return -EFAULT;
 	}
 
-	if (edid->data->rgb_quant_selectable)
-		ret |= FB_CAP_RGB_QUANT_SELECTABLE;
+	quant_cap_info->rgb_quant_selectable
+		= edid->data->rgb_quant_selectable;
 
-	if (edid->data->yuv_quant_selectable)
-		ret |= FB_CAP_YUV_QUANT_SELECTABLE;
+	quant_cap_info->yuv_quant_selectable
+		= edid->data->yuv_quant_selectable;
 
 	return ret;
 }

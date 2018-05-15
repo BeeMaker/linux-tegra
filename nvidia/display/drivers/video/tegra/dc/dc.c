@@ -4,7 +4,7 @@
  * Copyright (C) 2010 Google, Inc.
  * Author: Erik Gilling <konkers@android.com>
  *
- * Copyright (c) 2010-2017, NVIDIA CORPORATION, All rights reserved.
+ * Copyright (c) 2010-2018, NVIDIA CORPORATION, All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -5533,7 +5533,7 @@ static void tegra_dc_disable_irq_ops(struct tegra_dc *dc, bool from_irq)
 		dc->enabled = false;
 		dc->blanked = false;
 
-		if (!dc->suspended)
+		if (!atomic_read(&dc->suspended))
 			_tegra_dc_disable(dc);
 	}
 
@@ -6382,7 +6382,7 @@ static int tegra_dc_suspend(struct platform_device *ndev, pm_message_t state)
 	if (dc->enabled) {
 		_tegra_dc_disable(dc);
 
-		dc->suspended = true;
+		atomic_set(&dc->suspended, 1);
 	}
 
 	tegra_dc_release_common_channel(dc);
@@ -6421,7 +6421,7 @@ static int tegra_dc_resume(struct platform_device *ndev)
 	dev_info(&ndev->dev, "resume\n");
 
 	mutex_lock(&dc->lock);
-	dc->suspended = false;
+	atomic_set(&dc->suspended, 0);
 
 	/* To pan the fb on resume */
 	tegra_fb_pan_display_reset(dc->fb);
@@ -6494,7 +6494,7 @@ static int tegra_dc_suspend_pd(struct device *dev)
 	if (dc->enabled) {
 		_tegra_dc_disable(dc);
 
-		dc->suspended = true;
+		atomic_set(&dc->suspended, 1);
 	}
 
 	tegra_dc_release_common_channel(dc);
@@ -6533,7 +6533,7 @@ static int tegra_dc_resume_pd(struct device *dev)
 	dev_info(dev, "resume\n");
 
 	mutex_lock(&dc->lock);
-	dc->suspended = false;
+	atomic_set(&dc->suspended, 0);
 
 	/* To pan the fb on resume */
 	tegra_fb_pan_display_reset(dc->fb);

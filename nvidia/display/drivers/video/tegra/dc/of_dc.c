@@ -1,7 +1,7 @@
 /*
  * of_dc.c: tegra dc of interface.
  *
- * Copyright (c) 2013-2017, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2013-2018, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -876,24 +876,33 @@ static int parse_modes(struct tegra_dc_out *default_out,
 		modes->vmode = temp;
 	}
 
-	for (i = 0; pins && (i < default_out->n_out_pins); i++) {
-		switch (pins[i].name) {
-		case TEGRA_DC_OUT_PIN_DATA_ENABLE:
-			if (pins[i].pol == TEGRA_DC_OUT_PIN_POL_LOW)
-				modes->flags |= TEGRA_DC_MODE_FLAG_NEG_DE;
-			break;
-		case TEGRA_DC_OUT_PIN_H_SYNC:
-			if (pins[i].pol == TEGRA_DC_OUT_PIN_POL_LOW)
-				modes->flags |= TEGRA_DC_MODE_FLAG_NEG_H_SYNC;
-			break;
-		case TEGRA_DC_OUT_PIN_V_SYNC:
-			if (pins[i].pol == TEGRA_DC_OUT_PIN_POL_LOW)
-				modes->flags |= TEGRA_DC_MODE_FLAG_NEG_V_SYNC;
-			break;
-		default:
-			/* Ignore other pin setting */
-			break;
+	if (pins && default_out->n_out_pins) {
+		for (i = 0; i < default_out->n_out_pins; i++) {
+			switch (pins[i].name) {
+			case TEGRA_DC_OUT_PIN_DATA_ENABLE:
+				if (pins[i].pol == TEGRA_DC_OUT_PIN_POL_LOW)
+					modes->flags |=
+						TEGRA_DC_MODE_FLAG_NEG_DE;
+				break;
+			case TEGRA_DC_OUT_PIN_H_SYNC:
+				if (pins[i].pol == TEGRA_DC_OUT_PIN_POL_LOW)
+					modes->flags |=
+						TEGRA_DC_MODE_FLAG_NEG_H_SYNC;
+				break;
+			case TEGRA_DC_OUT_PIN_V_SYNC:
+				if (pins[i].pol == TEGRA_DC_OUT_PIN_POL_LOW)
+					modes->flags |=
+						TEGRA_DC_MODE_FLAG_NEG_V_SYNC;
+				break;
+			default:
+				/* Ignore other pin setting */
+				break;
+			}
 		}
+	} else {
+		/* Optional property. Don't fail if not specified */
+		if (!of_property_read_u32(np, "flags", &temp))
+			modes->flags = temp;
 	}
 
 	return 0;

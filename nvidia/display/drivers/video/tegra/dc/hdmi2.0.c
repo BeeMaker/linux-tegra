@@ -1,7 +1,7 @@
 /*
  * hdmi2.0.c: hdmi2.0 driver.
  *
- * Copyright (c) 2014-2017, NVIDIA CORPORATION, All rights reserved.
+ * Copyright (c) 2014-2018, NVIDIA CORPORATION, All rights reserved.
  * Author: Animesh Kishore <ankishore@nvidia.com>
  *
  * This software is licensed under the terms of the GNU General Public
@@ -32,6 +32,7 @@
 #endif
 #include <linux/of_address.h>
 #include <soc/tegra/tegra_powergate.h>
+#include <video/tegra_dc_ext.h>
 
 #include "dc.h"
 #include "dc_reg.h"
@@ -167,6 +168,9 @@ static int tegra_hdmi_ddc_i2c_xfer(struct tegra_dc *dc,
 	struct tegra_hdmi *hdmi = tegra_dc_get_outdata(dc);
 	int ret;
 
+	if (atomic_read(&hdmi->suspended))
+		return -EACCES;
+
 	_tegra_hdmi_ddc_enable(hdmi);
 	ret = i2c_transfer(hdmi->ddc_i2c_client->adapter, msgs, num);
 	_tegra_hdmi_ddc_disable(hdmi);
@@ -224,6 +228,9 @@ static int tegra_hdmi_scdc_i2c_xfer(struct tegra_dc *dc,
 					struct i2c_msg *msgs, int num)
 {
 	struct tegra_hdmi *hdmi = tegra_dc_get_outdata(dc);
+
+	if (atomic_read(&hdmi->suspended))
+		return -EACCES;
 
 	return i2c_transfer(hdmi->scdc_i2c_client->adapter, msgs, num);
 }
@@ -1693,31 +1700,29 @@ static u32 tegra_hdmi_get_ex_colorimetry(struct tegra_hdmi *hdmi)
 static u32 tegra_hdmi_get_rgb_quant(struct tegra_hdmi *hdmi)
 {
 	u32 vmode = hdmi->dc->mode.vmode;
+	u32 hdmi_quant = HDMI_AVI_RGB_QUANT_DEFAULT;
 
-	if (tegra_edid_get_quant_cap(hdmi->edid) & FB_CAP_RGB_QUANT_SELECTABLE)
-		return vmode & FB_VMODE_LIMITED_RANGE ?
-			HDMI_AVI_RGB_QUANT_LIMITED : HDMI_AVI_RGB_QUANT_FULL;
-	else
-		/*
-		 * The safest way to break the HDMI spec when forcing full range
-		 * on a limited system: send full data with the QUANT_DEFAULT
-		 * */
-		return HDMI_AVI_RGB_QUANT_DEFAULT;
+	if (tegra_edid_get_rgb_quant_cap(hdmi->edid)) {
+		if (vmode & FB_VMODE_LIMITED_RANGE)
+			hdmi_quant = HDMI_AVI_RGB_QUANT_LIMITED;
+		else
+			hdmi_quant = HDMI_AVI_RGB_QUANT_FULL;
+	}
+	return hdmi_quant;
 }
 
 static u32 tegra_hdmi_get_ycc_quant(struct tegra_hdmi *hdmi)
 {
 	u32 vmode = hdmi->dc->mode.vmode;
+	u32 hdmi_quant = HDMI_AVI_YCC_QUANT_NONE;
 
-	if (tegra_edid_get_quant_cap(hdmi->edid) & FB_CAP_YUV_QUANT_SELECTABLE)
-		return vmode & FB_VMODE_LIMITED_RANGE ?
-			HDMI_AVI_YCC_QUANT_LIMITED : HDMI_AVI_YCC_QUANT_FULL;
-	else
-		/*
-		 * The safest way to break the HDMI spec when forcing full range
-		 * on a limited system: send full data with the QUANT_DEFAULT
-		 * */
-		return HDMI_AVI_YCC_QUANT_NONE;
+	if (tegra_edid_get_yuv_quant_cap(hdmi->edid)) {
+		if (vmode & FB_VMODE_LIMITED_RANGE)
+			hdmi_quant = HDMI_AVI_YCC_QUANT_LIMITED;
+		else
+			hdmi_quant = HDMI_AVI_YCC_QUANT_FULL;
+	}
+	return hdmi_quant;
 }
 
 static void tegra_hdmi_avi_infoframe_update(struct tegra_hdmi *hdmi)
@@ -2151,13 +2156,45 @@ static int tegra_hdmi_v2_x_config(struct tegra_hdmi *hdmi)
 	return 0;
 }
 
+static int tegra_hdmi_v2_scdc_status_update_reset(struct tegra_hdmi *hdmi)
+{
+	u8 tmds_scdc_status_update_reset[][2] = {
+		{
+			HDMI_SCDC_STATUS_UPDATE_FLAGS_0,
+			HDMI_SCDC_STATUS_FLAGS_0_UPDATE
+		},
+	};
+
+	if (hdmi->dc->vedid)
+		goto skip_scdc_i2c;
+
+	tegra_hdmi_scdc_write(hdmi,
+			tmds_scdc_status_update_reset,
+			ARRAY_SIZE(tmds_scdc_status_update_reset));
+
+skip_scdc_i2c:
+	return 0;
+}
+
 static void tegra_hdmi_scdc_worker(struct work_struct *work)
 {
 	struct tegra_hdmi *hdmi = container_of(to_delayed_work(work),
 				struct tegra_hdmi, scdc_work);
 	u8 rd_status_flags[][2] = {
-		{HDMI_SCDC_STATUS_FLAGS, 0x0}
+		{HDMI_SCDC_TMDS_SINK_VERSION, 0x0},
+		{HDMI_SCDC_STATUS_UPDATE_FLAGS_0, 0x0},
+		{HDMI_SCDC_STATUS_FLAGS_SCRAMBLER, 0x0},
+		{HDMI_SCDC_STATUS_FLAGS_0, 0x0},
+		{HDMI_SCDC_STATUS_FLAGS_1, 0x0},
+		{HDMI_SCDC_ERR_DET_0_LOW, 0x0},
+		{HDMI_SCDC_ERR_DET_0_HIGH, 0x0},
+		{HDMI_SCDC_ERR_DET_1_LOW, 0x0},
+		{HDMI_SCDC_ERR_DET_1_HIGH, 0x0},
+		{HDMI_SCDC_ERR_DET_2_LOW, 0x0},
+		{HDMI_SCDC_ERR_DET_2_HIGH, 0x0},
+		{HDMI_SCDC_ERR_DET_CHECKSUM, 0x0},
 	};
+	int i;
 
 	if (!hdmi->enabled || hdmi->dc->mode.pclk <= 340000000)
 		return;
@@ -2168,11 +2205,34 @@ static void tegra_hdmi_scdc_worker(struct work_struct *work)
 	if (!tegra_edid_is_scdc_present(hdmi->dc->edid))
 		return;
 
-	tegra_hdmi_scdc_read(hdmi, rd_status_flags, ARRAY_SIZE(rd_status_flags));
-	if (!rd_status_flags[0][1]  && (hdmi->dc->mode.pclk > 340000000)) {
+	tegra_hdmi_scdc_read(hdmi, rd_status_flags,
+					ARRAY_SIZE(rd_status_flags));
+	if (!rd_status_flags[2][1]  && (hdmi->dc->mode.pclk > 340000000)) {
 		dev_info(&hdmi->dc->ndev->dev, "hdmi: scdc scrambling status is reset, "
 						"trying to reconfigure.\n");
 		_tegra_hdmi_v2_x_config(hdmi);
+	}
+
+	hdmi->scdc_status.sink_version = rd_status_flags[0][1];
+	hdmi->scdc_status.scrambler_status = rd_status_flags[2][1];
+	hdmi->scdc_status.status_flag_0 = rd_status_flags[3][1];
+	hdmi->scdc_status.status_flag_1 = rd_status_flags[4][1];
+	for (i = 0; i < 3; i++) {
+		u16 err = rd_status_flags[i*2 + 5][1] |
+			((rd_status_flags[i*2 + 6][1]) << 8);
+
+		hdmi->scdc_status.chan_err[i].valid =
+			err & 0x8000 ? true : false;
+		err &= 0x7fff;
+		hdmi->scdc_status.chan_err[i].last = err;
+		hdmi->scdc_status.chan_err[i].total += err;
+	}
+	hdmi->scdc_status.err_crc = rd_status_flags[11][1];
+	hdmi->scdc_status.read_count++;
+
+	if (rd_status_flags[1][1] & HDMI_SCDC_STATUS_FLAGS_0_UPDATE) {
+		dev_dbg(&hdmi->dc->ndev->dev, "hdmi: scdc status update\n");
+		tegra_hdmi_v2_scdc_status_update_reset(hdmi);
 	}
 
 skip_scdc_i2c:
@@ -3048,6 +3108,68 @@ static const struct file_operations tegra_hdmi_ddc_power_toggle_dbg_ops = {
 	.release = single_release,
 };
 
+/* show current scdc status */
+static int tegra_hdmi_scdc_dbg_show(struct seq_file *m, void *unused)
+{
+	struct tegra_hdmi *hdmi = m->private;
+	struct tegra_dc *dc = hdmi->dc;
+	u32 i;
+	struct hdmi_scdc_status *ss;
+
+	if (WARN_ON(!hdmi || !dc || !dc->out))
+		return -EINVAL;
+
+	rmb();
+
+	if (!hdmi->enabled || hdmi->dc->mode.pclk <= 340000000) {
+		seq_printf(m, "scdc disabled\n");
+		return 0;
+	}
+
+	if (!tegra_edid_is_scdc_present(hdmi->dc->edid)) {
+		seq_printf(m, "scdc not supported by sink\n");
+		return 0;
+	}
+
+	ss = &hdmi->scdc_status;
+	seq_printf(m, "scdc status         :\n");
+	seq_printf(m, "read count          : %u\n", ss->read_count);
+	seq_printf(m, "sink version        : %u\n", ss->sink_version);
+	seq_printf(m, "scrambler status    : %s\n", ss->scrambler_status ?
+			"enabled" : "disabled");
+	seq_printf(m, "status flags 0      : 0x%x\n", ss->status_flag_0);
+	seq_printf(m, "  channel locked    : ch2 %s, ch1 %s, ch0 %s, clk %s\n",
+		   ss->status_flag_0 & 0x8 ? "yes" : "no",
+		   ss->status_flag_0 & 0x4 ? "yes" : "no",
+		   ss->status_flag_0 & 0x2 ? "yes" : "no",
+		   ss->status_flag_0 & 0x1 ? "yes" : "no");
+	seq_printf(m, "status flags 1      : 0x%x\n", ss->status_flag_1);
+
+	seq_printf(m, "char-err detection  :\n");
+	for (i = 0; i < 3; i++) {
+		seq_printf(m, "  chan %d, %s, error: last %u, total %u\n",
+			   i,
+			   ss->chan_err[i].valid ? "valid" : "not valid",
+			   ss->chan_err[i].last,
+			   ss->chan_err[i].total);
+	}
+	seq_printf(m, "char-err crc        : 0x%x\n", ss->err_crc);
+
+	return 0;
+}
+
+static int tegra_hdmi_scdc_dbg_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, tegra_hdmi_scdc_dbg_show, inode->i_private);
+}
+
+static const struct file_operations tegra_hdmi_scdc_dbg_ops = {
+	.open = tegra_hdmi_scdc_dbg_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+};
+
 static int tegra_hdmi_status_dbg_show(struct seq_file *m, void *unused)
 {
 	struct tegra_hdmi *hdmi = m->private;
@@ -3102,6 +3224,10 @@ static void tegra_hdmi_debugfs_init(struct tegra_hdmi *hdmi)
 	}
 	ret = debugfs_create_file("hotplug", S_IRUGO, hdmi->debugdir,
 				hdmi, &tegra_hdmi_hotplug_dbg_ops);
+	if (IS_ERR_OR_NULL(ret))
+		goto fail;
+	ret = debugfs_create_file("scdc", S_IRUGO, hdmi->debugdir,
+				hdmi, &tegra_hdmi_scdc_dbg_ops);
 	if (IS_ERR_OR_NULL(ret))
 		goto fail;
 	ret = debugfs_create_file("hdmi_status", S_IRUGO, hdmi->debugdir,

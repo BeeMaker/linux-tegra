@@ -548,6 +548,8 @@ struct tegra_dc_ext_set_vblank {
 enum tegra_dc_ext_cap_type {
 	TEGRA_DC_EXT_CAP_TYPE_NONE, /* dummy value - do not use */
 	TEGRA_DC_EXT_CAP_TYPE_HDR_SINK, /* struct tegra_dc_ext_hdr_caps */
+	TEGRA_DC_EXT_CAP_TYPE_QUANT_SELECTABLE,
+		/* struct tegra_dc_ext_quant_caps */
 	TEGRA_DC_EXT_CAP_TYPE_MAX,
 };
 
@@ -582,6 +584,19 @@ struct tegra_dc_ext_hdr_caps {
 	__u8 desired_content_max_lum;
 	__u8 desired_content_max_frame_avg_lum;
 	__u8 desired_content_min_lum;
+};
+
+/*
+ * tegra_dc_ext_quant_caps : Incorporates target display's quantization
+ * capabilities.
+ * rgb_quant_selectable : indicates whether rgb quantization range is
+ * selectable
+ * yuv_quant_selectable : indicates whether yuv quantization range is
+ * selectable
+ */
+struct tegra_dc_ext_quant_caps {
+	__u8 rgb_quant_selectable;
+	__u8 yuv_quant_selectable;
 };
 
 /*

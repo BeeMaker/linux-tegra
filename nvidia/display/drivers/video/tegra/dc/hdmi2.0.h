@@ -26,15 +26,44 @@
 #define HDMI_HDR_INFOFRAME_STOP_TIMEOUT_MS	(2000)
 
 /* SCDC block */
+#define HDMI_SCDC_TMDS_SINK_VERSION	(0x01)
+
+#define HDMI_SCDC_STATUS_UPDATE_FLAGS_0	(0x10)
+#define HDMI_SCDC_STATUS_FLAGS_0_UPDATE	(1)
+
+#define HDMI_SCDC_STATUS_UPDATE_FLAGS_1	(0x11)
+
 #define HDMI_SCDC_TMDS_CONFIG_OFFSET	(0x20)
 #define HDMI_SCDC_TMDS_CONFIG_SCRAMBLING_EN	(1)
 #define HDMI_SCDC_TMDS_CONFIG_SCRAMBLING_DIS	(1)
 #define HDMI_SCDC_TMDS_CONFIG_BIT_CLK_RATIO_10	(0 << 1)
 #define HDMI_SCDC_TMDS_CONFIG_BIT_CLK_RATIO_40	(1 << 1)
 
-#define HDMI_SCDC_STATUS_FLAGS	(0x21)
+#define HDMI_SCDC_STATUS_FLAGS_SCRAMBLER	(0x21)
 #define HDMI_SCDC_STATUS_FLAGS_SCRAMBLING_EN	(1)
 #define HDMI_SCDC_STATUS_FLAGS_SCRAMBLING_DIS	(0)
+
+#define HDMI_SCDC_STATUS_FLAGS_0		(0x40)
+#define HDMI_SCDC_STATUS_FLAGS_0_CLOCK_DETECTED	(1)
+#define HDMI_SCDC_STATUS_FLAGS_0_CH_0_LOCKED	(1 << 1)
+#define HDMI_SCDC_STATUS_FLAGS_0_CH_1_LOCKED	(1 << 2)
+#define HDMI_SCDC_STATUS_FLAGS_0_CH_2_LOCKED	(1 << 3)
+
+#define HDMI_SCDC_STATUS_FLAGS_1	(0x41)
+
+#define HDMI_SCDC_ERR_DET_0_LOW		(0x50)
+#define HDMI_SCDC_ERR_DET_0_HIGH	(0x51)
+#define HDMI_SCDC_ERR_DET_0_VALID	(1 << 7)
+
+#define HDMI_SCDC_ERR_DET_1_LOW		(0x52)
+#define HDMI_SCDC_ERR_DET_1_HIGH	(0x53)
+#define HDMI_SCDC_ERR_DET_1_VALID	(1 << 7)
+
+#define HDMI_SCDC_ERR_DET_2_LOW		(0x54)
+#define HDMI_SCDC_ERR_DET_2_HIGH	(0x55)
+#define HDMI_SCDC_ERR_DET_2_VALID	(1 << 7)
+
+#define HDMI_SCDC_ERR_DET_CHECKSUM	(0x56)
 
 #define YUV_MASK (FB_VMODE_Y420 | FB_VMODE_Y420_ONLY | \
 				FB_VMODE_Y422 | FB_VMODE_Y444)
@@ -405,6 +434,20 @@ enum {
 	TEGRA_HDMI_BRICK_CLK = 2,
 };
 
+struct hdmi_scdc_status {
+	u32 read_count;
+	u8 sink_version;
+	u8 scrambler_status;
+	u8 status_flag_0;
+	u8 status_flag_1;
+	struct {
+		bool valid;
+		u16 last;
+		u32 total;
+	} chan_err[3];
+	u8 err_crc;
+};
+
 struct tmds_prod_pair {
 	int clk;           /* upper freq of a range. 0:end of the array */
 	const char *name;  /* prod-setting node name */
@@ -473,6 +516,7 @@ struct tegra_hdmi {
 	bool device_shutdown;
 	int plug_state;
 	atomic_t suspended;
+	struct hdmi_scdc_status scdc_status;
 	struct delayed_work hdr_worker;
 	struct tegra_hdmi_out_ops *out_ops;
 	void	*out_data;	/* HDMI to GMSL bridge, etc. */

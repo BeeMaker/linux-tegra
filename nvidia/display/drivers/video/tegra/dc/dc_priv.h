@@ -4,7 +4,7 @@
  * Copyright (C) 2010 Google, Inc.
  * Author: Erik Gilling <konkers@android.com>
  *
- * Copyright (c) 2010-2017, NVIDIA CORPORATION, All rights reserved.
+ * Copyright (c) 2010-2018, NVIDIA CORPORATION, All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -454,11 +454,20 @@ static inline void tegra_disp_clk_disable_unprepare(struct clk *clk)
 		clk_disable_unprepare(clk);
 }
 
+/* defined in dc.c, used in nvsd.c and dsi.c */
+void tegra_dc_get(struct tegra_dc *dc);
+void tegra_dc_put(struct tegra_dc *dc);
+
 #if IS_ENABLED(CONFIG_PM_GENERIC_DOMAINS)
 static inline void tegra_dc_powergate_locked(struct tegra_dc *dc)
 {
 #if defined(CONFIG_TEGRA_NVDISPLAY)
-	tegra_nvdisp_powergate_partition(dc->powergate_id);
+	int ret;
+
+	ret = tegra_nvdisp_powergate_partition(dc->powergate_id);
+	/* Give up the reference to host1x clock. */
+	if (!ret)
+		tegra_dc_put(dc);
 #else
 	tegra_powergate_partition(dc->powergate_id);
 #endif
@@ -469,6 +478,15 @@ static inline void tegra_dc_unpowergate_locked(struct tegra_dc *dc)
 	int ret;
 #if defined(CONFIG_TEGRA_NVDISPLAY)
 	ret = tegra_nvdisp_unpowergate_partition(dc->powergate_id);
+	/* Hold reference to host1x clk here to avoid negative perf impact
+	* everytime we call tegra_dc_get() before every register access.
+	* NvDisplay doamin clocks are always enabled as long the head is
+	* enabled. However host1x clocks need not be and hence it might
+	* regress power for usecase like display idle. Need to revist this
+	* when there is such regression in power.
+	*/
+	if (!ret)
+		tegra_dc_get(dc);
 #else
 	ret = tegra_unpowergate_partition(dc->powergate_id);
 #endif
@@ -568,10 +586,6 @@ int tegra_dc_ddc_enable(struct tegra_dc *dc, bool enabled);
 /* defined in dc.c, used in dsi.c */
 void tegra_dc_clk_enable(struct tegra_dc *dc);
 void tegra_dc_clk_disable(struct tegra_dc *dc);
-
-/* defined in dc.c, used in nvsd.c and dsi.c */
-void tegra_dc_get(struct tegra_dc *dc);
-void tegra_dc_put(struct tegra_dc *dc);
 
 /* defined in dc.c, used in tegra_adf.c */
 void tegra_dc_hold_dc_out(struct tegra_dc *dc);
