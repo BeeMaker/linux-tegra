@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2016-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * NVIDIA CORPORATION and its licensors retain all intellectual property
  * and proprietary rights in and to this software, related documentation
@@ -29,6 +29,15 @@
 #define MC_ECC_LOG_WRITE_STOP_MODE                1
 
 #define MC_ECC_LOG_BUFF_DEPTH                    32
+
+#define DRAM_ECC_SCRUB_TIMEOUT_COUNT             05
+#define DRAM_ECC_SCRUB_DELAY_US                  10
+
+enum dram_ecc_err_type {
+	DRAM_ECC_NO_ERROR,
+	DRAM_ECC_CORRECTABLE_ERROR,
+	DRAM_ECC_UNCORRECTABLE_ERROR,
+};
 
 extern void __iomem *emc;
 extern void __iomem *emc_regs[MAX_CHANNELS];

@@ -1,7 +1,7 @@
 /*
  * Tegra 18x SoC-specific DRAM ECC Error handling code.
  *
- * Copyright (c) 2016, NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2017, NVIDIA Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,10 +18,11 @@
  * 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  */
 
-#define pr_fmt(fmt) "dram-ecc: " fmt
+#define pr_fmt(fmt) "ecc-err: " fmt
 
 #include <linux/kernel.h>
 #include <linux/uaccess.h>
+#include <linux/delay.h>
 #include <linux/debugfs.h>
 #include <linux/seq_file.h>
 #include <linux/of.h>
@@ -45,6 +46,9 @@ static u32 gbl_int_status;
 u32 ecc_int_mask;
 static u32 ecc_err_silenced;
 
+#define PMC_IMPL_CNTRL_0                          0x00
+#define MAIN_RST_MASK                             (1<<0x4)
+
 #define ecc_err_pr(fmt, ...)					\
 	do {							\
 		if (!ecc_err_silenced) {			\
@@ -53,15 +57,23 @@ static u32 ecc_err_silenced;
 		}						\
 	} while (0)
 
-static int mc_check_ebe(struct mc_ecc_err_log *log)
+static int mc_check_sbe_ecc(struct mc_ecc_err_log *log)
 {
-	if ((log->ecc_eerr_par_sp0) || (log->ecc_eerr_par_sp1))
+	if ((log->ecc_eerr_par_sp0 == 1) || (log->ecc_eerr_par_sp1 == 1))
 		return 1;
 
 	return 0;
 }
 
-static int mc_check_sbe(struct mc_ecc_err_log *log)
+static int mc_check_dbe_ecc(struct mc_ecc_err_log *log)
+{
+	if ((log->ecc_eerr_par_sp0 == 2) || (log->ecc_eerr_par_sp1 == 2))
+		return 1;
+
+	return 0;
+}
+
+static int mc_check_sbe_data(struct mc_ecc_err_log *log)
 {
 	if ((log->ecc_derr_par_sp0 == 1) || (log->ecc_derr_par_sp1 == 1))
 		return 1;
@@ -69,7 +81,7 @@ static int mc_check_sbe(struct mc_ecc_err_log *log)
 	return 0;
 }
 
-static int mc_check_dbe(struct mc_ecc_err_log *log)
+static int mc_check_dbe_data(struct mc_ecc_err_log *log)
 {
 	if ((log->ecc_derr_par_sp0 == 2) || (log->ecc_derr_par_sp1 == 2))
 		return 1;
@@ -255,6 +267,8 @@ static void mc_ecc_clear_all_intr(void)
 static void mc_ecc_sec_scrub(u32 scrub_addr)
 {
 	u32 val;
+	u32 count = 0;
+	int result = 0;
 
 	mc_writel(scrub_addr, MC_MEM_SCRUBBER_ECC_ADDR);
 
@@ -267,47 +281,94 @@ static void mc_ecc_sec_scrub(u32 scrub_addr)
 	mc_writel(val, MC_MEM_SCRUBBER_ECC_REG_CTRL);
 
 	do {
+		if (count >= DRAM_ECC_SCRUB_TIMEOUT_COUNT) {
+			ecc_err_pr("demand scrub timeout, addr = 0x%x\n",
+								scrub_addr);
+			result = -EBUSY;
+			break;
+		}
+
+		udelay(DRAM_ECC_SCRUB_DELAY_US);
+
 		val = mc_readl(MC_MEM_SCRUBBER_ECC_REG_CTRL);
 		val = ((val >> SCRUB_ECC_PENDING_SHIFT) &
 					SCRUB_ECC_PENDING_MASK);
 		pr_debug("SCrubbing in progress : %d\n", val);
+		count++;
 	} while (val);
 
-	pr_debug("SCrubbing done\n");
+	if (result == 0)
+		pr_debug("SCrubbing done\n");
+}
+
+static void mc_ecc_handle_correctable_error(struct mc_ecc_err_log *pecclog,
+							u64 addr)
+{
+	mc_ecc_dump_regs(pecclog);
+
+	if (pecclog->ecc_err_cgid != HW_SCRUBBER_CGID) {
+		/*
+		 * Demand scrub in case of SBE for reads (except for reads
+		 * by the HW scrubber)
+		*/
+		ecc_err_pr("Demand scrubbing for correctable DRAM ECC Error\n");
+		mc_ecc_sec_scrub((u32)(addr >> 6));
+	} else {
+		ecc_err_pr("SBE reported for read from HW scrubber\n");
+	}
+}
+
+static void mc_ecc_handle_uncorrectable_error(struct mc_ecc_err_log *pecclog)
+{
+	mc_ecc_dump_regs(pecclog);
+
+	/* Execution shall be stopped in case of DRAM ECC fatal error */
+	BUG_ON(true);
 }
 
 static void mc_check_ecc_err(struct mc_ecc_err_log *pecclog, u32 ch)
 {
-	u32 err = false;
+	enum dram_ecc_err_type err = DRAM_ECC_NO_ERROR;
 	u64 addr;
 
 	addr = mc_ecc_read_log(pecclog, ch);
 	mc_ecc_dump_log(pecclog);
 
 	if (mc_check_poison(pecclog)) {
-		ecc_err_pr("-----POISON Bit ERR, addr:0x%016llx\n",
-								addr);
-		err = true;
-	}
-	if (mc_check_ebe(pecclog)) {
-		ecc_err_pr("-----ECC Bit ERR, addr:0x%016llx\n", addr);
-		err = true;
-	}
-	if (mc_check_sbe(pecclog)) {
-		ecc_err_pr("------SBE ERR, addr:0x%016llx\n", addr);
-		err = true;
-		/* Demand scrub in case of SBE */
-		if (pecclog->ecc_err_cgid != HW_SCRUBBER_CGID)
-			mc_ecc_sec_scrub((u32)(addr >> 6));
-	}
-	if (mc_check_dbe(pecclog)) {
-		ecc_err_pr("------DBE ERR, addr:0x%016llx\n", addr);
-		err = true;
-		mc_ecc_dump_regs(pecclog);
+
+		ecc_err_pr("POISON Bit ERR, addr:0x%016llx\n", addr);
+		err = DRAM_ECC_UNCORRECTABLE_ERROR;
 	}
 
-	if (err)
-		mc_ecc_dump_regs(pecclog);
+	if (mc_check_dbe_data(pecclog)) {
+
+		ecc_err_pr("Data bit DBE ERR , addr:0x%016llx\n", addr);
+		err = DRAM_ECC_UNCORRECTABLE_ERROR;
+	}
+
+	if (mc_check_dbe_ecc(pecclog)) {
+
+		ecc_err_pr("ecc bit DBE ERR , addr:0x%016llx\n", addr);
+		err = DRAM_ECC_UNCORRECTABLE_ERROR;
+	}
+
+	if (err == DRAM_ECC_UNCORRECTABLE_ERROR)
+		mc_ecc_handle_uncorrectable_error(pecclog);
+
+	if (mc_check_sbe_data(pecclog)) {
+
+		ecc_err_pr("Data bit SBE ERR, addr:0x%016llx\n", addr);
+		err = DRAM_ECC_CORRECTABLE_ERROR;
+	}
+
+	if (mc_check_sbe_ecc(pecclog)) {
+
+		ecc_err_pr("ECC bit SBE ERR, addr:0x%016llx\n", addr);
+		err = DRAM_ECC_CORRECTABLE_ERROR;
+	}
+
+	if (err == DRAM_ECC_CORRECTABLE_ERROR)
+		mc_ecc_handle_correctable_error(pecclog, addr);
 }
 
 static void mc_ecc_dump_ch_logs(uint32_t ch)
@@ -379,6 +440,7 @@ static int mc_ecc_debugfs_dump_status(struct seq_file *s, void *v)
 
 	return 0;
 }
+
 static void mc_increase_ecc_errors(void)
 {
 	mc_writel(0x02, MC_TIMING_CONTROL_DBG);
@@ -612,36 +674,6 @@ static int mc_ecc_debugfs_init(struct dentry *mc_parent)
 	return 0;
 }
 
-static u32 mc_ecc_check_err_handling(void)
-{
-	struct device_node *rtcpu_sce = of_find_node_by_path("/rtcpu@b000000");
-	u32 handle_ecc_err;
-
-	if (!rtcpu_sce) {
-		pr_err("Unable to get rtcpu_sce node, Handle DRAM ECC Errors in Kernel\n");
-		handle_ecc_err = 1;
-		goto exit;
-	}
-
-	if (of_device_is_available(rtcpu_sce)) {
-		/*
-		 * if rtcpu@b000000 is enabled SCE is booted with Camera FW
-		 * ,So we handle DRAM ECC errors @ CCPLEX from Kernel
-		*/
-		pr_info("DRAM ECC interrupts handled in Kernel\n");
-		handle_ecc_err = 1;
-	} else {
-		/*
-		 * if rtcpu@b000000 is disabled SCE is booted with sample
-		 * safety FW, so we handle DRAM ECC errors @ SCE
-		*/
-		pr_info("DRAM ECC interrupts handled in SCE FW\n");
-		handle_ecc_err = 0;
-	}
-exit:
-	return handle_ecc_err;
-}
-
 static int mc_ecc_err_init(struct dentry *mc_parent,
 				struct platform_device *pdev)
 {
@@ -723,16 +755,13 @@ void tegra_emcerr_init(struct dentry *mc_parent, struct platform_device *pdev)
 	u32 mc_ecc_control = mc_readl(MC_ECC_CONTROL);
 
 	if (mc_ecc_control & 1) {
-		pr_info("DRAM ECC enabled-MC_ECC_CONTROL:0x%08x\n",
+		pr_info("dram ecc enabled-MC_ECC_CONTROL:0x%08x\n",
 							mc_ecc_control);
-
-		if (mc_ecc_check_err_handling()) {
-			if (mc_ecc_err_init(mc_parent, pdev))
-				pr_err("ecc error init failed\n");
-		}
+		if (mc_ecc_err_init(mc_parent, pdev))
+			pr_err("ecc error init failed\n");
 
 	} else {
-		pr_info("DRAM ECC disabled-MC_ECC_CONTROL:0x%08x\n",
+		pr_info("dram ecc disabled-MC_ECC_CONTROL:0x%08x\n",
 							mc_ecc_control);
 	}
 }

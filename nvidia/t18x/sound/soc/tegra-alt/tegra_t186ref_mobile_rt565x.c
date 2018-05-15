@@ -1,7 +1,7 @@
 /*
  * tegra_t186ref_mobile_rt565x.c - Tegra t186ref Machine driver
  *
- * Copyright (c) 2015-2017 NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2015-2018 NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -85,6 +85,7 @@ struct tegra_t186ref {
 	int rate_via_kcontrol;
 	int is_codec_dummy;
 	int fmt_via_kcontrol;
+	unsigned int bclk_ratio_override;
 };
 
 static const int tegra_t186ref_srate_values[] = {
@@ -182,14 +183,43 @@ static struct snd_soc_pcm_stream tegra_t186ref_asrc_link_params[] = {
 	PARAMS(SNDRV_PCM_FMTBIT_S16_LE, 2),
 };
 
+static int tegra_t186ref_set_bclk_ratio(struct tegra_t186ref *machine,
+					struct snd_soc_pcm_runtime *rtd)
+{
+	unsigned int bclk_ratio;
+	int err = 0;
+
+	if (machine->bclk_ratio_override)
+		bclk_ratio = machine->bclk_ratio_override;
+	else
+		bclk_ratio = tegra_machine_get_bclk_ratio_t18x(rtd);
+
+	if (bclk_ratio >= 0)
+		err = snd_soc_dai_set_bclk_ratio(rtd->cpu_dai, bclk_ratio);
+
+	return err;
+}
+
+static int tegra_t186ref_set_tdm_slot(struct snd_soc_pcm_runtime *rtd)
+{
+	unsigned int fmt, mask;
+	int err = 0;
+
+	fmt = rtd->dai_link->dai_fmt & SND_SOC_DAIFMT_FORMAT_MASK;
+	mask = (1 << rtd->dai_link->params->channels_min) - 1;
+
+	if ((fmt == SND_SOC_DAIFMT_DSP_A) || (fmt == SND_SOC_DAIFMT_DSP_B))
+		err = snd_soc_dai_set_tdm_slot(rtd->cpu_dai, mask, mask, 0, 0);
+
+	return err;
+}
+
 static int tegra_t186ref_set_params(struct snd_soc_card *card,
 				    struct tegra_t186ref *machine,
 				    int rate,
 				    int channels,
 				    u64 formats)
 {
-	unsigned int tx_mask = (1 << channels) - 1;
-	unsigned int rx_mask = (1 << channels) - 1;
 	int idx, err = 0;
 	u64 format_k;
 	int num_of_dai_links = TEGRA186_XBAR_DAI_LINKS +
@@ -212,40 +242,22 @@ static int tegra_t186ref_set_params(struct snd_soc_card *card,
 			dai_params->formats = format_k;
 
 			if (idx >= TEGRA186_XBAR_DAI_LINKS) {
-				unsigned int fmt;
-				int bclk_ratio;
-
-				err = 0;
 				dai_params->formats = formats;
 
-				fmt = card->rtd[idx].dai_link->dai_fmt;
-				bclk_ratio =
-					tegra_machine_get_bclk_ratio_t18x(
-						&card->rtd[idx]);
-
-				if (bclk_ratio >= 0) {
-					err = snd_soc_dai_set_bclk_ratio(
-							card->rtd[idx].cpu_dai,
-							bclk_ratio);
-				}
-
+				err = tegra_t186ref_set_bclk_ratio(machine,
+							&card->rtd[idx]);
 				if (err < 0) {
 					dev_err(card->dev,
 					"Failed to set cpu dai bclk ratio for %s\n",
 					card->rtd[idx].dai_link->name);
 				}
 
-				/* set TDM slot mask */
-				if ((fmt & SND_SOC_DAIFMT_FORMAT_MASK) ==
-							SND_SOC_DAIFMT_DSP_A) {
-					err = snd_soc_dai_set_tdm_slot(
-							card->rtd[idx].cpu_dai,
-							tx_mask, rx_mask, 0, 0);
-					if (err < 0) {
-						dev_err(card->dev,
+				err = tegra_t186ref_set_tdm_slot(
+							&card->rtd[idx]);
+				if (err < 0) {
+					dev_err(card->dev,
 						"%s cpu DAI slot mask not set\n",
 						card->rtd[idx].cpu_dai->name);
-					}
 				}
 			}
 		}
@@ -831,6 +843,28 @@ static int tegra_t186ref_codec_put_jack_state(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+static int tegra_t186ref_bclk_ratio_get(struct snd_kcontrol *kcontrol,
+					struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_card *card = snd_kcontrol_chip(kcontrol);
+	struct tegra_t186ref *machine = snd_soc_card_get_drvdata(card);
+
+	ucontrol->value.integer.value[0] = machine->bclk_ratio_override;
+
+	return 0;
+}
+
+static int tegra_t186ref_bclk_ratio_put(struct snd_kcontrol *kcontrol,
+					struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_card *card = snd_kcontrol_chip(kcontrol);
+	struct tegra_t186ref *machine = snd_soc_card_get_drvdata(card);
+
+	machine->bclk_ratio_override = ucontrol->value.integer.value[0];
+
+	return 0;
+}
+
 static const struct soc_enum tegra_t186ref_codec_rate =
 	SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(tegra_t186ref_srate_text),
 		tegra_t186ref_srate_text);
@@ -858,6 +892,8 @@ static const struct snd_kcontrol_new tegra_t186ref_controls[] = {
 	SOC_ENUM_EXT("Jack-state", tegra_t186ref_jack_state,
 		tegra_t186ref_codec_get_jack_state,
 		tegra_t186ref_codec_put_jack_state),
+	SOC_SINGLE_EXT("bclk ratio override", SND_SOC_NOPM, 0, INT_MAX, 0,
+		tegra_t186ref_bclk_ratio_get, tegra_t186ref_bclk_ratio_put),
 };
 
 static struct snd_soc_card snd_soc_tegra_t186ref = {
@@ -1065,7 +1101,7 @@ static int tegra_t186ref_driver_probe(struct platform_device *pdev)
 					&pdev->dev,
 					card);
 	if (ret)
-		goto err_alloc_dai_link;
+		goto err_switch_unregister;
 
 	ret = snd_soc_register_card(card);
 	if (ret) {
@@ -1088,17 +1124,21 @@ static int tegra_t186ref_driver_probe(struct platform_device *pdev)
 			dev_info(&pdev->dev, "This is a dummy codec\n");
 			machine->is_codec_dummy = 1;
 		}
-	}
 
-	if (!machine->is_codec_dummy) {
-		/* setup for jack detection only in non-dummy case */
-		rt5659_set_jack_detect(codec, &tegra_t186ref_hp_jack);
+		if (!machine->is_codec_dummy) {
+			/* setup for jack detection only in non-dummy case */
+			rt5659_set_jack_detect(codec, &tegra_t186ref_hp_jack);
+		}
 	}
 
 	return 0;
 
 err_fini_utils:
 	tegra_alt_asoc_utils_fini(&machine->audio_clock);
+err_switch_unregister:
+#ifdef CONFIG_SWITCH
+	tegra_alt_asoc_switch_unregister(&tegra_t186ref_headset_switch);
+#endif
 err_alloc_dai_link:
 	tegra_machine_remove_dai_link();
 	tegra_machine_remove_codec_conf();
@@ -1114,6 +1154,9 @@ static int tegra_t186ref_driver_remove(struct platform_device *pdev)
 
 	snd_soc_unregister_card(card);
 
+#ifdef CONFIG_SWITCH
+	tegra_alt_asoc_switch_unregister(&tegra_t186ref_headset_switch);
+#endif
 	tegra_machine_remove_dai_link();
 	tegra_machine_remove_codec_conf();
 	tegra_alt_asoc_utils_fini(&machine->audio_clock);
