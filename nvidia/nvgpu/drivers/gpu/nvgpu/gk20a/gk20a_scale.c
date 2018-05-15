@@ -266,40 +266,6 @@ void gk20a_scale_resume(struct device *dev)
 }
 
 /*
- * gk20a_scale_notify(dev, busy)
- *
- * Calling this function informs that the device is idling (..or busy). This
- * data is used to estimate the current load
- */
-
-static void gk20a_scale_notify(struct device *dev, bool busy)
-{
-	struct gk20a *g = get_gk20a(dev);
-	struct gk20a_scale_profile *profile = g->scale_profile;
-	struct devfreq *devfreq = g->devfreq;
-
-	/* Is the device profile initialised? */
-	if (!(profile && devfreq))
-		return;
-
-	mutex_lock(&devfreq->lock);
-	profile->dev_stat.busy = busy;
-	update_devfreq(devfreq);
-	mutex_unlock(&devfreq->lock);
-}
-
-void gk20a_scale_notify_idle(struct device *dev)
-{
-	gk20a_scale_notify(dev, false);
-
-}
-
-void gk20a_scale_notify_busy(struct device *dev)
-{
-	gk20a_scale_notify(dev, true);
-}
-
-/*
  * gk20a_scale_get_dev_status(dev, *stat)
  *
  * This function queries the current device status.
@@ -393,6 +359,7 @@ void gk20a_scale_init(struct device *dev)
 		profile->devfreq_profile.get_dev_status =
 			gk20a_scale_get_dev_status;
 		profile->devfreq_profile.get_cur_freq = get_cur_freq;
+		profile->devfreq_profile.polling_ms = 25;
 
 		devfreq = devfreq_add_device(dev,
 					&profile->devfreq_profile,
