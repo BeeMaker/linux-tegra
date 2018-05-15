@@ -25,9 +25,6 @@
 	#size-cells = <2>;
 
 	chosen {
-		bootloader {
-			nvidia,skip-display-init;
-		};
 	};
 
 	host1x {
@@ -81,6 +78,11 @@
 
 	watchdog@60005100 {
 		status = "okay";
+	};
+	reserved-memory {
+		vpr-carveout {
+			     status = "disabled";
+		     };
 	};
 };
 

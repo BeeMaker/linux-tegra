@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2016, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2017, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,6 +21,7 @@
 / {
 	dvfs {
 		compatible = "nvidia,tegra210-dvfs";
+		vdd-cpu-supply = <&cpu_ovr_reg>;
 	};
 
 	i2c@7000d000 {
@@ -218,6 +219,8 @@
 					maxim,active-fps-source = <MAX77620_FPS_SRC_0>;
 					maxim,active-fps-power-up-slot = <7>;
 					maxim,active-fps-power-down-slot = <0>;
+					regulator-always-on;
+					regulator-boot-on;
 				};
 
 				max77620_ldo7: ldo7 {

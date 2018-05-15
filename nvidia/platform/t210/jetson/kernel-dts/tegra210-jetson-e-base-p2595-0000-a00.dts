@@ -1,7 +1,7 @@
 /*
  * arch/arm64/boot/dts/tegra210-jetson-e-base-p2595-0000-a00.dts
  *
- * Copyright (c) 2014-2017, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2014-2018, NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -61,22 +61,22 @@
 	#size-cells = <2>;
 
 	chosen {
+		stdout-path = &uarta;
 	};
 
 	pmc@7000e400 {
 		nvidia,invert-interrupt;
-
-		io-pad-defaults {
-			audio-hv {
-				nvidia,io-pad-init-voltage = <IO_PAD_VOLTAGE_1_8V>;
-			};
-
-			spi-hv {
-				nvidia,io-pad-init-voltage = <IO_PAD_VOLTAGE_1_8V>;
-			};
-		};
-
 		iopad-defaults {
+			audio-hv-pads {
+				pins = "audio-hv";
+				nvidia,power-source-voltage = <TEGRA_IO_PAD_VOLTAGE_1800000UV>;
+			};
+
+			spi-hv-pads {
+				pins = "spi-hv";
+				nvidia,power-source-voltage = <TEGRA_IO_PAD_VOLTAGE_1800000UV>;
+			};
+
 			sdmmc-io-pads {
 				pins = "sdmmc1";
 				nvidia,enable-voltage-switching;
@@ -358,25 +358,6 @@
 			};
 		};
 
-		sor1 {
-			hdmi-display {
-				nvidia,fbcon-default-mode {
-					clock-frequency = <27027000>;
-					hactive = <720>;
-					vactive = <480>;
-					hfront-porch = <16>;
-					hback-porch = <60>;
-					hsync-len = <62>;
-					vfront-porch = <9>;
-					vback-porch = <30>;
-					vsync-len = <6>;
-					nvidia,h-ref-to-sync = <1>;
-					nvidia,v-ref-to-sync = <1>;
-					vmode = <0x400000>;	/* FB_VMODE_NONINTERLACED | FB_VMODE_IS_CEA */
-				};
-			};
-		};
-
 		dpaux1 {
 			status = "okay";
 		};
@@ -472,7 +453,7 @@
 			bitclock-slave;
 			frame-slave;
 			bitclock-inversion;
-			frame-inversion;
+			frame-noninversion;
 			bit-format = "s16_le";
 			bclk_ratio = <4>;
 			srate = <8000>;
@@ -715,6 +696,20 @@
 		nvidia,margin = <0>;
 		nvidia,min_budget = <0>;
 		nvidia,initial_budget = <40000>;
+	};
+
+	sysedp_reactive_capping@1 {
+		compatible = "nvidia,tegra124-sysedp_reactive_capping";
+		nvidia,max_capping_mw = <15000>;
+		nvidia,step_alarm_mw = <1000>;
+		nvidia,step_relax_mw = <500>;
+		nvidia,relax_ms = <250>;
+		nvidia,threshold_warning = "WARNING - SYSTEM Voltage Droop detected, please refer to the Jetson Power management application note";
+		interrupt-parent = <&soctherm>;
+		interrupts = <1 0x2002>;
+		sysedpc {
+			nvidia,name = "voltmon_oc1";
+		};
 	};
 
 	sysedp_reactive_capping@3 {

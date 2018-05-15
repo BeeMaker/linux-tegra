@@ -20,7 +20,6 @@
 
 #include <dt-bindings/display/tegra-dc.h>
 #include <dt-bindings/soc/tegra-pmc.h>
-#define HDMI_INFOFRAME_TYPE_HDR 0x87
 
 / {
 	host1x {
