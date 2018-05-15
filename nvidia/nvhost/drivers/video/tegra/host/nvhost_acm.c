@@ -1244,6 +1244,9 @@ static int nvhost_module_prepare_poweroff(struct device *dev)
 	if (!pdata)
 		return -EINVAL;
 
+	if (!pdata->power_on)
+		return 0;
+
 	host = nvhost_get_host(pdata->pdev);
 
 	devfreq_suspend_device(pdata->power_manager);
@@ -1326,6 +1329,10 @@ static int nvhost_module_finalize_poweron(struct device *dev)
 			break;
 	}
 
+	/* Failed to start the device */
+	if (ret)
+		goto out;
+
 	/* set default EMC rate to zero */
 	if (pdata->bwmgr_handle) {
 		for (i = 0; i < NVHOST_MODULE_MAX_CLOCKS; i++) {
@@ -1346,6 +1353,7 @@ static int nvhost_module_finalize_poweron(struct device *dev)
 
 	pdata->power_on = true;
 
+out:
 	return ret;
 }
 #endif

@@ -1363,6 +1363,15 @@ u32 nvhost_syncpt_incr_max_ext(struct platform_device *dev, u32 id, u32 incrs)
 }
 EXPORT_SYMBOL(nvhost_syncpt_incr_max_ext);
 
+u32 nvhost_syncpt_decr_max_ext(struct platform_device *dev, u32 id, u32 decrs)
+{
+	struct nvhost_master *master = nvhost_get_host(dev);
+	struct nvhost_syncpt *sp =
+		nvhost_get_syncpt_owner_struct(id, &master->syncpt);
+	return nvhost_syncpt_decr_max(sp, id, decrs);
+}
+EXPORT_SYMBOL(nvhost_syncpt_decr_max_ext);
+
 void nvhost_syncpt_cpu_incr_ext(struct platform_device *dev, u32 id)
 {
 	struct nvhost_master *master = nvhost_get_host(dev);

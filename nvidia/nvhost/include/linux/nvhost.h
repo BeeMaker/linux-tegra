@@ -711,6 +711,7 @@ void nvhost_syncpt_get_ref_ext(struct platform_device *pdev, u32 id);
 void nvhost_syncpt_put_ref_ext(struct platform_device *pdev, u32 id);
 const char *nvhost_syncpt_get_name(struct platform_device *dev, int id);
 u32 nvhost_syncpt_incr_max_ext(struct platform_device *dev, u32 id, u32 incrs);
+u32 nvhost_syncpt_decr_max_ext(struct platform_device *dev, u32 id, u32 decrs);
 void nvhost_syncpt_cpu_incr_ext(struct platform_device *dev, u32 id);
 int nvhost_syncpt_read_ext_check(struct platform_device *dev, u32 id, u32 *val);
 int nvhost_syncpt_wait_timeout_ext(struct platform_device *dev, u32 id, u32 thresh,

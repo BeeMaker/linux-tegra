@@ -15,6 +15,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+#define DEBUG
 #include <linux/device.h>
 #include <linux/export.h>
 #include <linux/module.h>
@@ -202,13 +203,17 @@ int nvcsi_finalize_poweron(struct platform_device *pdev)
 		}
 	}
 
-	return 0;
+	return tegra_csi_mipi_calibrate(&nvcsi->csi, true);
 }
 
 int nvcsi_prepare_poweroff(struct platform_device *pdev)
 {
 	struct nvcsi *nvcsi = nvhost_get_private_data(pdev);
 	int ret;
+
+	ret = tegra_csi_mipi_calibrate(&nvcsi->csi, false);
+	if (ret)
+		dev_err(&pdev->dev, "disable mipi calibraiton failed\n");
 
 	if (nvcsi->regulator) {
 		ret = regulator_disable(nvcsi->regulator);

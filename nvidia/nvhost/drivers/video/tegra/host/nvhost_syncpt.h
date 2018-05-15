@@ -3,7 +3,7 @@
  *
  * Tegra Graphics Host Syncpoints
  *
- * Copyright (c) 2010-2015, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2010-2017, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -82,6 +82,12 @@ static inline u32 nvhost_syncpt_incr_max(struct nvhost_syncpt *sp,
 					u32 id, u32 incrs)
 {
 	return (u32)atomic_add_return(incrs, &sp->max_val[id]);
+}
+
+static inline u32 nvhost_syncpt_decr_max(struct nvhost_syncpt *sp,
+					u32 id, u32 decrs)
+{
+	return (u32)atomic_sub_return(decrs, &sp->max_val[id]);
 }
 
 /**
