@@ -28,7 +28,7 @@
 		clock-names = "serial", "parent";
 		resets = <&tegra_car TEGRA186_RESET_UARTA>;
 		reset-names = "serial";
-		status = "disabled";
+		status = "okay";
 		nvidia,adjust-baud-rates = <115200 115200 100>;
 	};
 
@@ -46,7 +46,7 @@
 		clock-names = "serial", "parent";
 		resets = <&tegra_car TEGRA186_RESET_UARTB>;
 		reset-names = "serial";
-		status = "disabled";
+		status = "okay";
 		nvidia,adjust-baud-rates = <115200 115200 100>;
 	};
 
