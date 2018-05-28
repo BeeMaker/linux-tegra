@@ -1,6 +1,6 @@
 ccflags-y := -Werror
 ccflags-y += -I$(srctree)/include
-ccflags-y += -I$(srctree)/../nvhost
+ccflags-y += -I$(srctree)/nvidia/nvhost
 ccflags-y += -I$(srctree)
 ccflags-y += -I$(srctree)/nvidia/t18x
 ccflags-y += -I$(srctree)/nvidia/t18x/drivers/platform/tegra/rtcpu
