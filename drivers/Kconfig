@@ -206,8 +206,8 @@ source "drivers/hwtracing/intel_th/Kconfig"
 
 source "drivers/fpga/Kconfig"
 
-trysource "../nvgpu/drivers/gpu/nvgpu/Kconfig"
-trysource "../nvgpu/drivers/gpu/nvgpu/Kconfig.nvgpu"
+trysource "nvidia/nvgpu/drivers/gpu/nvgpu/Kconfig"
+trysource "nvidia/nvgpu/drivers/gpu/nvgpu/Kconfig.nvgpu"
 trysource "drivers/gpu/nvgpu/Kconfig.nvgpu"
 
 trysource "../nvhost-t18x/drivers/video/tegra/host/Kconfig"
