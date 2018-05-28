@@ -1,6 +1,6 @@
 GCOV_PROFILE := y
 subdir-ccflags-y := -Werror
-EXTRA_CFLAGS += -I../nvhost/drivers/video/tegra/host
+EXTRA_CFLAGS += -Invidia/nvhost/drivers/video/tegra/host
 EXTRA_CFLAGS += -Idrivers/video/tegra/host
 ccflags-$(CONFIG_TRUSTED_LITTLE_KERNEL) += -I../../../../../kernel-4.4/security/tlk_driver/
 ifeq ($(CONFIG_TEGRA_NVDISPLAY),y)
