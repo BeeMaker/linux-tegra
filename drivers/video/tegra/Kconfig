@@ -1,5 +1,5 @@
-trysource "../nvhost/drivers/video/tegra/Kconfig"
-trysource "../nvhost/drivers/video/tegra/Kconfig.nvhost"
+trysource "nvidia/nvhost/drivers/video/tegra/Kconfig"
+trysource "nvidia/nvhost/drivers/video/tegra/Kconfig.nvhost"
 trysource "drivers/video/tegra/Kconfig.nvhost"
 
 config TEGRA_GRHOST_SYNC
