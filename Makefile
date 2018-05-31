@@ -742,7 +742,7 @@ endif
 KBUILD_CFLAGS += -I$(srctree)/../nvhost/include
 KBUILD_CFLAGS += -I$(srctree)/nvidia/display/include
 KBUILD_CFLAGS += -I$(srctree)/../nvmap/include
-KBUILD_CFLAGS += -I$(srctree)/../nvgpu/include
+KBUILD_CFLAGS += -I$(srctree)/nvidia/nvgpu/include
 
 ifdef CONFIG_DEBUG_INFO_REDUCED
 KBUILD_CFLAGS 	+= $(call cc-option, -femit-struct-debug-baseonly) \
