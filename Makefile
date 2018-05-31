@@ -741,7 +741,7 @@ KBUILD_CFLAGS += -I$(srctree)/../t18x/include
 endif
 KBUILD_CFLAGS += -I$(srctree)/nvidia/nvhost/include
 KBUILD_CFLAGS += -I$(srctree)/nvidia/display/include
-KBUILD_CFLAGS += -I$(srctree)/../nvmap/include
+KBUILD_CFLAGS += -I$(srctree)/nvidia/nvmap/include
 KBUILD_CFLAGS += -I$(srctree)/nvidia/nvgpu/include
 
 ifdef CONFIG_DEBUG_INFO_REDUCED
