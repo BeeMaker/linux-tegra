@@ -5,7 +5,7 @@
 #include <t18x-common-platforms/tegra186-tx2-cti-camera-ASG002.dtsi>
 
 /{
-    nvidia,dtsfilename = "tegra186-tx2-cti-ASG002-revF+.dts";
+    nvidia,dtsfilename = "tegra186-tx2-cti-ASG002-revG.dts";
     nvidia,dtbbuildtime = __DATE__, __TIME__;
 
     gpio@2200000 {
